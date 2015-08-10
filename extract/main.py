@@ -8,13 +8,19 @@ from mysql.connector import errorcode
 import socket
 import ip_info
 import re
-from multiprocessing import Pool, Process, Queue
-from multiprocessing import Value, Lock
+#from multiprocessing import Pool, Process, Queue
+#from multiprocessing import Value, Lock
+import threading
+import time
+import sys
+sys.path.append('../analysis/')
+import analysis
+import cProfile
 
-
-cityService = ip_info.CityService()
-pattern = re.compile('https?://((\w+\.?)+)/.*')
-ip_pattern = re.compile('^(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5])$')
+cityService = None
+pattern = None
+ip_pattern = None
+statistic = None
 
 
 class Extract:
@@ -29,12 +35,22 @@ class Extract:
             print("finished read file")
             return self.process_line()
 
-    def process_line(self,):
+    #@profile
+    def process_line(self):
+        statistic = analysis.Statistics()
+        cityService = ip_info.CityService()
+        pattern = re.compile('https?://((\w+\.?)+)/.*')
+        ip_pattern = re.compile('^(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5])$')
+
         res = []
+        count = 0
         for line in self.lines:
+            count += 1
+            if count >= 100000:
+                pass
+                #break
             columns = line.split("\t")
-            date = columns[0]
-            time = columns[1]
+            datetime = columns[1]
             explain = columns[2]
             src_ip = columns[3]
             name = columns[4].split('.')[0]
@@ -56,63 +72,102 @@ class Extract:
                     self.dns[addr_url] = source_addr
             extra = columns[8]
             extra = extra.strip()
-            l = (time, explain, src_ip, name, isp, prov, city, addr_url, source_addr, extra)
+            l = (datetime, explain, src_ip, name, isp, prov, city, addr_url, source_addr, extra)
             res.append(l)
+            statistic.count(l)
+            l = None
+            datetime = None
+            explain = None
+            src_ip = None
+            name = None
+            isp = None
+            prov = None
+            city = None
+            addr_url = None
+            source_addr = None
+            extra = None
+            line = None
+        self.lines = None
+        pattern = None
+        ip_pattern = None
+        cityService.destory()
+        statistic.get_top()
         return res
 
+#@profile
+def insert_log(cnxpool, log):
+    while True:
+        try:
+            #conn = cnxpool.get_connection()
+            conn = mysql.connector.connect(**config.mysql)
+            cursor = conn.cursor()
+            insert_statement = ' '.join(log)
+            #cursor.execute(insert_statement)
+            conn.commit()
+        except mysql.connector.errors.PoolError:
+            pass
+        except mysql.connector.errors.DatabaseError as err:
+            print(err)
+            time.sleep(1)
+        except mysql.connector.Error as err:
+            print(err)
+            conn.rollback()
+        else:
+            cursor.close()
+            conn.close()
+            break
 
+#@profile
 def store(logs):
     try:
-        conn = mysql.connector.connect(**config.mysql)
+        cnxpool = mysql.connector.pooling.MySQLConnectionPool(pool_name="pool",
+                     pool_size = 2, **config.mysql)
     except mysql.connector.Error as err:
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("cann't connect to mysql server")
         if err.errno == errorcode.ER_BAD_DB_ERROR:
             print("database doesn't exist")
-    cursor = conn.cursor()
-    #cursor.execute("set NAMES latin1")
-    conn.commit()
 
     base_insert_log = (u"INSERT INTO {}(datetime,some,IP,name,ISP,prov,city,url,server,extra) VALUES ")
     values = "('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')"
     insert_state_map = {}
     count_map = {}
+    threads = []
+
     for l in logs:
         prov = l[5]
         insert_state = ''
-        if insert_state_map.get(prov):
+        if insert_state_map.get(prov) and len(insert_state_map[prov]):
             insert_state = insert_state_map[prov]
-            insert_state += ", "
+            insert_state.append(',')
         else:
+            insert_state_map[prov] = []
             insert_state = base_insert_log.format(config.prov_to_table[prov])
-            insert_state_map[prov] = insert_state
-        insert_state += (values % l)
-        insert_state_map[prov] = insert_state
+            insert_state_map[prov].append(insert_state)
+            insert_state = insert_state_map[prov]
+        insert_state.append(values % l)
         if count_map.get(prov) == None:
             count_map[prov] = 0
         count_map[prov] += 1
-        if count_map[prov] < 3000:
+        if count_map[prov] < 2000:
             continue
-        try:
-            cursor.execute(insert_state)
-            conn.commit()
+        else:
+            t = threading.Thread(target = insert_log, args=(cnxpool, insert_state[:]), daemon=False)
+            #t = Process(target=insert_log, args=(cnxpool, insert_state[:]))
+            threads.append(t)
+            t.start()
             insert_state_map.pop(prov)
             count_map[prov] = 0
-        except mysql.connector.Error as err:
-            print(err)
-            conn.rollback()
-    cursor.execute("START TRANSACTION")
+    #cursor.execute("START TRANSACTION")
     for k in insert_state_map:
-        try:
-            cursor.execute(insert_state_map[k])
-            conn.commit()
-        except mysql.connector.Error as err:
-            print(err)
-            conn.rollback()
-    cursor.execute("commit")
-
-    cursor.close()
-    conn.close()
+        t = threading.Thread(target = insert_log, args=(cnxpool, insert_state_map[k][:]), daemon=False)
+        #t = Process(target=insert_log, args=(cnxpool, insert_state_map[k][:]))
+        t.start()
+        threads.append(t)
+    insert_state_map = []
+    for i in threads:
+        i.join()
+    #cursor.execute("commit")
 
 
 def store_detail(details):
@@ -185,7 +240,10 @@ def get_logs(start=0, limit=0):
     cursor = conn.cursor()
 
     try:
-        cursor.execute("select * from logs limit " + str(start) + "," + str(limit))
+        if limit != 0:
+            cursor.execute("select * from logs limit " + str(start) + "," + str(limit))
+        else:
+            cursor.execute("select * from logs limit " + str(start) + ", 18446744073709551615")
     except Exception as e:
         print(e)
     for i in cursor:
@@ -196,22 +254,22 @@ def f(logs):
     for i in logs:
         print(i)
 
-if __name__ == "__main__":
+#@profile
+def __main():
     e = Extract()
-    import cProfile
-    import time
     #cProfile.run('e.extract()', sort='cumulative')
-    print(time.clock())
     logs = e.extract()
     print("extract finished")
-    print("logs length is ", len(logs))
-    print(time.clock())
-    cProfile.run('store(logs)', sort='cumulative')
-    print(time.clock())
+    #print("logs length is ", len(logs))
+    #cProfile.run('store(logs)', sort='cumulative')
     #store(logs)
+    logs = None
+
+
+if __name__ == "__main__":
+    __main()
     '''
-    start = 268112
-    for i in range(100):
-        for detail in get_detail(start + 10000 * i):
-            store_detail(detail)
+    e = Extract()
+    import cProfile
+    cProfile.run('e.extract()', sort='cumulative')
     '''

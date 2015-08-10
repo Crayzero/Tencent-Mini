@@ -40,21 +40,29 @@ def get_ip_info(ip):
 
 def get_vedio_info(vid):
     url = "http://openi.video.qq.com/fcgi-bin/vinfo?vid=%s&op_ref=xxx&appkey=xxx"
+    many = False
     if isinstance(vid, str):
         pass
     else:
         vid = '|'.join(vid)
+        many = True
+    res = []
     try:
         rsp = requests.get(url, params={'vid': vid})
         if rsp.status_code == 200:
+            print('OK')
             res_xml = BeautifulSoup(rsp.text, "lxml")
             videos = res_xml.root.vd.find_all('vi')
             if int(res_xml.root.result.code.string) == 0:
                 n = int(res_xml.root.nt.string)
                 for i in range(n):
                     video = videos[i]
-                    res = (video.n.string, video.t.string, video.png.string)
-                    return res
+                    vid_info = (video.n.string, video.t.string, video.png.string)
+                    if not many:
+                        return  vid_info
+                    else:
+                        res.append(vid_info)
+                return res
     except requests.exceptions.RequestException as e:
         print(e)
     except Exception as e:
@@ -67,6 +75,8 @@ class CityService:
         ipd = '../src-logs/ipd.pkl'
         with open(ipd, 'rb') as f:
             self.a = pickle.load(f, encoding='utf-8')
+        ipd = None
+        f.close()
         self.count = 0
 
     def get_city_by_ip(self, ip):
@@ -83,6 +93,10 @@ class CityService:
     def print_all_ip_city(self):
         for i in self.a:
             print(i, self.a[i])
+
+    def destory(self):
+        self.a = None
+        self.count = 0
 
 if __name__ == '__main__':
     cityService = CityService()

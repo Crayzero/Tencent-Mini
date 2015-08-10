@@ -6,6 +6,7 @@ import mysql.connector
 from mysql.connector import errorcode
 
 def op_tables(statement):
+    res = []
     try:
         cnx = mysql.connector.connect(**config.mysql)
     except mysql.connector.Error as err:
@@ -18,10 +19,18 @@ def op_tables(statement):
         cursor = cnx.cursor()
         for i in config.prov_to_table:
             print(statement.format(config.prov_to_table[i]))
-            cursor.execute(statement.format(config.prov_to_table[i]))
+            try:
+                cursor.execute(statement.format(config.prov_to_table[i]))
+                result = cursor.fetchone()
+                for i in result:
+                    res.append(i)
+                cnx.commit()
+            except mysql.connector.errors.ProgrammingError as err:
+                print(err)
     except mysql.connector.Error as err:
         print(err)
         raise(err)
+    return res
 
 def build_tables():
     create_statement = "CREATE TABLE IF NOT EXISTS {} LIKE logs"
@@ -36,6 +45,14 @@ def clear_table():
     clear_statement = "DELETE FROM {}"
     op_tables(clear_statement)
 
+def get_total():
+    total_statement = "SELECT COUNT(*) FROM {}"
+    res = op_tables(total_statement)
+    cnt = 0
+    for i in res:
+        cnt += i
+    print("total is ", cnt)
+
 
 if __name__ == '__main__':
     import sys
@@ -45,3 +62,5 @@ if __name__ == '__main__':
         drop_table()
     elif sys.argv[1] == 'clear':
         clear_table()
+    elif sys.argv[1] == 'total':
+        get_total()
