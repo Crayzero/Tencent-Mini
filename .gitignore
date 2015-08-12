@@ -2,3 +2,4 @@ src-logs/*
 *.pyc
 extract/output.txt
 *.lprof
+web/mini/node_modules/*

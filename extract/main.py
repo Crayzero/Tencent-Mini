@@ -16,6 +16,9 @@ import sys
 sys.path.append('../analysis/')
 import analysis
 import cProfile
+import pika
+import json
+import os.path
 
 pattern = None
 ip_pattern = None
@@ -46,9 +49,9 @@ class Extract:
         count = 0
         for line in self.lines:
             count += 1
-            if count >= 10000:
-                #pass
-                break
+            if count >= 100000:
+                pass
+                #break
             columns = line.split("\t")
             datetime = columns[1]
             if self.start_time == None:
@@ -96,7 +99,48 @@ class Extract:
         cityService.destory()
         cityService = None
         statistic.get_top()
+        self.report_finish()
         return res
+
+    def report_finish(self):
+        rabbitmq_servers = ['localhost']
+        server_index = 0
+        msg = {}
+        msg["start_time"] = self.start_time
+        msg['end_time'] = self.end_time
+        msg['key'] = os.path.basename(self.__file)
+        msg = json.dumps(msg)
+        while True:
+            try:
+                cnx = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_servers[server_index]))
+                channel = cnx.channel()
+
+                channel.queue_declare(queue='task_finished', exclusive=False)
+                res = channel.basic_publish(exchange='',
+                        routing_key='task_finished',
+                        body=msg,
+                        properties=pika.BasicProperties(
+                            content_type='application/json',
+                            delivery_mode=1
+                                    ), mandatory=True)
+                cnx.close()
+                if res:
+                    break
+                else:
+                    print('Message was returned, try another server.')
+            except pika.exceptions.AMQPConnectionError as err:
+                print("cann't connect to the server.. try annother...")
+                server_index += 1
+                if server_index >= len(rabbitmq_servers):
+                    print("all tried.. please check the rabbitmq server..")
+                    raise(err)
+            except pika.exceptions.ChannelError as err:
+                print("channel error.")
+                server_index += 1
+                raise(err)
+            except pika.exceptions.AMQPError as err:
+                print(err)
+                raise(err)
 
 #@profile
 def insert_log(cnxpool, log):

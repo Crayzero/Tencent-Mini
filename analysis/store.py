@@ -42,9 +42,13 @@ class RedisStorage:
             print(e)
             raise(e)
 
+    def get_file_name(self, file_path):
+        return os.path.basename(file_path)
+
     def store_top(self, file_name, res):
         value = json.dumps(res)
-        self._store(self.file_hash(file_name), value)
+        #self._store(self.file_hash(file_name), value)
+        self._store(self.get_file_name(file_name), value)
         value = None
 
     def get_top(self, key):
