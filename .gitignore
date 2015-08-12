@@ -1,2 +1,4 @@
 src-logs/*
 *.pyc
+extract/output.txt
+*.lprof

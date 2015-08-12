@@ -22,8 +22,9 @@ def op_tables(statement):
             try:
                 cursor.execute(statement.format(config.prov_to_table[i]))
                 result = cursor.fetchone()
-                for i in result:
-                    res.append(i)
+                if result:
+                    for i in result:
+                        res.append(i)
                 cnx.commit()
             except mysql.connector.errors.ProgrammingError as err:
                 print(err)

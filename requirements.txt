@@ -1,0 +1,8 @@
+pika = 0.10.0b2
+beautifulsoup4
+lxml
+html5lib
+mysql-connector-python
+redis
+requests
+

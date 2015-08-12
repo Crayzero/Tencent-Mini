@@ -6,6 +6,8 @@ import struct
 import requests
 from bs4 import BeautifulSoup
 import html
+import pickle
+import json
 
 
 def get_ip_info(ip):
@@ -70,10 +72,14 @@ def get_vedio_info(vid):
     return ()
 
 class CityService:
-    def __init__(self):
-        import pickle
-        ipd = '../src-logs/ipd.pkl'
-        with open(ipd, 'rb') as f:
+    def __init__(self, use_json = False):
+        if use_json:
+            ipd = '../src-logs/ipd.json'
+            f = open(ipd, 'r')
+            self.a = json.load(f)
+        else:
+            ipd = '../src-logs/ipd.pkl'
+            f = open(ipd, 'rb')
             self.a = pickle.load(f, encoding='utf-8')
         ipd = None
         f.close()
@@ -94,10 +100,17 @@ class CityService:
         for i in self.a:
             print(i, self.a[i])
 
+    def to_json(self, file):
+        json.dump(self.a, file, ensure_ascii=False, indent='\t')
+
     def destory(self):
-        self.a = None
+        del self.a
         self.count = 0
 
+def test():
+    cityService = CityService(True)
+    cityService.destory()
+
+
 if __name__ == '__main__':
-    cityService = CityService()
-    cityService.get_city_by_ip
+    test()

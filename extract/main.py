@@ -17,7 +17,6 @@ sys.path.append('../analysis/')
 import analysis
 import cProfile
 
-cityService = None
 pattern = None
 ip_pattern = None
 statistic = None
@@ -27,6 +26,8 @@ class Extract:
     def __init__(self):
         self.__file = config.log_file
         self.dns = {}
+        self.start_time = None
+        self.end_time = None
 
     def extract(self):
         with codecs.open(self.__file, "r", 'cp936') as f:
@@ -35,10 +36,9 @@ class Extract:
             print("finished read file")
             return self.process_line()
 
-    #@profile
     def process_line(self):
-        statistic = analysis.Statistics()
-        cityService = ip_info.CityService()
+        statistic = analysis.Statistics(self.__file)
+        cityService = ip_info.CityService(True)
         pattern = re.compile('https?://((\w+\.?)+)/.*')
         ip_pattern = re.compile('^(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5])$')
 
@@ -46,11 +46,14 @@ class Extract:
         count = 0
         for line in self.lines:
             count += 1
-            if count >= 100000:
-                pass
-                #break
+            if count >= 10000:
+                #pass
+                break
             columns = line.split("\t")
             datetime = columns[1]
+            if self.start_time == None:
+                self.start_time = datetime
+            self.end_time = datetime
             explain = columns[2]
             src_ip = columns[3]
             name = columns[4].split('.')[0]
@@ -91,6 +94,7 @@ class Extract:
         pattern = None
         ip_pattern = None
         cityService.destory()
+        cityService = None
         statistic.get_top()
         return res
 
@@ -102,7 +106,7 @@ def insert_log(cnxpool, log):
             conn = mysql.connector.connect(**config.mysql)
             cursor = conn.cursor()
             insert_statement = ' '.join(log)
-            #cursor.execute(insert_statement)
+            cursor.execute(insert_statement)
             conn.commit()
         except mysql.connector.errors.PoolError:
             pass
@@ -254,7 +258,6 @@ def f(logs):
     for i in logs:
         print(i)
 
-#@profile
 def __main():
     e = Extract()
     #cProfile.run('e.extract()', sort='cumulative')
@@ -270,6 +273,5 @@ if __name__ == "__main__":
     __main()
     '''
     e = Extract()
-    import cProfile
     cProfile.run('e.extract()', sort='cumulative')
     '''
