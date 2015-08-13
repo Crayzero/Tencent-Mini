@@ -11,6 +11,7 @@ import time
 import heapq
 import json
 import store
+import re
 
 class Statistics:
     def __init__(self, path, host='localhost', port=6379, db=0):
@@ -73,18 +74,14 @@ class Statistics:
             prov_vid_count = {}
 
             #get top 10 of all city in the prov
-            city_top10 = self.get_top_in_city(prov)
-            self.results[prov]['city'] = {}
-            self.results[prov]['city']['top10'] = city_top10
             res_json[prov]['city'] = {}
-            for city in city_top10:
-                res_json[prov]['city'][city] = {}
-                res_json[prov]['city'][city]['top10'] = []
-                for i in city_top10[city]:
-                    res_json[prov]['city'][city]['top10'].append({'vid': i[1], 'count': i[0]})
 
             #count total prov vid
             for city in prov_count:
+                if city == '未知':
+                    pass
+                res_json[prov]['city'][city] = {}
+                res_json[prov]['city'][city]['count'] = len(prov_count[city])
                 for vid in prov_count[city]:
                     if prov_vid_count.get(vid) == None:
                         prov_vid_count[vid] = 0
@@ -109,7 +106,9 @@ class Statistics:
             res_json[prov]['top10'] = []
             print('{', prov, ':')
             for i in self.results[prov]['top10']:
+                #can get video name
                 #res_json[prov]['top10'].append({'name': i[1][0], 'count': i[0], 'type': i[1][1], 'PNG': i[1][2]})
+                #cann't get video name
                 res_json[prov]['top10'].append({'vid': i[1], 'count': i[0]})
             print(res_json[prov])
             print('\}')
@@ -145,18 +144,30 @@ class Statistics:
         res = []
         top10_count = 0
         for i in top:
+            #can get video name
             '''
             vid_name = ip_info.get_vedio_info(i[1])
-            print(vid_name)
             if self.is_valid(vid_name[0]):
                 top10_count += 1
                 self.results[prov]['top10'].append((i[0], vid_name))
             '''
+            #cann't get video name
             top10_count += 1
             if top10_count >= 10:
                 break
             res.append((i[0], i[1]))
         return res
+
+    def is_valid(self, name):
+        if re.match('\d+\w+', name):
+            return False
+        if re.match('[a-z]+\d+', name):
+            return False
+        if re.match('\w+.flv\Z', name):
+            return False
+        if re.match('预告片.*', name):
+            return False
+        return True
 
 if __name__ == '__main__':
     analysis()

@@ -108,7 +108,7 @@ class CityService:
         self.count = 0
 
 def test():
-    cityService = CityService(True)
+    cityService = CityService()
     cityService.destory()
 
 

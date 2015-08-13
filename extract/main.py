@@ -37,6 +37,7 @@ class Extract:
             self.line_count = 0
             self.lines = f.readlines()
             print("finished read file")
+            print(time.clock())
             return self.process_line()
 
     def process_line(self):
@@ -303,10 +304,12 @@ def f(logs):
         print(i)
 
 def __main():
+    print(time.clock())
     e = Extract()
     #cProfile.run('e.extract()', sort='cumulative')
     logs = e.extract()
     print("extract finished")
+    print(time.clock())
     #print("logs length is ", len(logs))
     #cProfile.run('store(logs)', sort='cumulative')
     #store(logs)

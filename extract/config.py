@@ -12,6 +12,14 @@ mysql = {
     'charset': 'utf8'
 }
 
+redis_servers = [
+        {
+            "host": 'localhost',
+            "port": 6379,
+            "db": 0
+        },
+]
+
 prov_to_table = {
         "湖北": "logs_hubei",
         "北京": "logs_beijing",

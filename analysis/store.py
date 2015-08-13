@@ -9,7 +9,12 @@ import codecs
 
 class RedisStorage:
     def __init__(self, host='localhost', port=6379, db=0):
-        self.pool = redis.ConnectionPool(host=host, port=port, db=db)
+        try:
+            self.pool = redis.ConnectionPool(host=host, port=port, db=db)
+        except redis.exceptions.ConnectionError as err:
+            print("cann't connect to the server")
+            print(err)
+            raise(err)
 
     def _store(self, key, value):
         try:
