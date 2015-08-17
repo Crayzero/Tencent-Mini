@@ -25,6 +25,7 @@ class Reduce:
         self.queue = 'task_finished'
         self.redis_client = store.RedisStorage()
         self.redis_final_result_key = "result"
+        self.total = 12
         pass
 
     def callback(self, ch, method, properties, body):
@@ -119,7 +120,7 @@ class Reduce:
             self.redis_client.store(log_num, json.dumps(res))
 
     def reduced_all(self, res):
-        if len(res['processed']) == 3:
+        if len(res['processed']) == self.total:
             if len(res) == 1:
                 return True
             for prov in res:
@@ -188,9 +189,11 @@ class Reduce:
             return False
         if re.match('[a-z]+\d+', name):
             return False
-        if re.match('\w+.flv\Z', name):
+        if re.match('\w+\.flv\Z', name):
             return False
         if re.match('预告片.*', name):
+            return False
+        if re.match(".*\.mp4", name):
             return False
         return True
 

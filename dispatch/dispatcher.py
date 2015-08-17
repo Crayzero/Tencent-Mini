@@ -30,7 +30,6 @@ class Rsync:
             last_slash_index = src.rfind('/')
             src_base_path = src[:last_slash_index+1]
             files = self.rsync_file(src, dst)
-            print(files)
             for file in files:
                 if self.processed.get(file) == None:
                     self.report_new_file(src_base_path + file)

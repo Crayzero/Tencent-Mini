@@ -67,20 +67,23 @@ class Extract:
             if count >= 100000:
                 pass
                 #break
-            columns = line.split("\t")
-            datetime = columns[1]
-            if self.start_time == None:
-                self.start_time = datetime
-            self.end_time = datetime
-            explain = columns[2]
-            src_ip = columns[3]
-            name = columns[4].split('.')[0]
-            isp = columns[5]
-            prov = columns[6]
-            city = cityService.get_city_by_ip(src_ip)
-            if city == None:
-                city = 'NULL'
-            addr = columns[7]
+            try:
+                columns = line.split("\t")
+                datetime = columns[1]
+                if self.start_time == None:
+                    self.start_time = datetime
+                self.end_time = datetime
+                explain = columns[2]
+                src_ip = columns[3]
+                name = columns[4].split('.')[0]
+                isp = columns[5]
+                prov = columns[6]
+                city = cityService.get_city_by_ip(src_ip)
+                if city == None:
+                    city = 'NULL'
+                addr = columns[7]
+            except IndexError:
+                continue
             if pattern.match(addr):
                 addr_url = pattern.match(addr).group(1)
             else:
