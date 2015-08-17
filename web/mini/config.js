@@ -1,7 +1,8 @@
 var config = {};
 
 config.rabbitmq_servers = ['localhost'];
-config.task_finished = 'task_finished';
+config.task_finished = 'new_result';
+config.result = 'result'
 
 
 config.redis = {

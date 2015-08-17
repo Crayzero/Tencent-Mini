@@ -26,25 +26,39 @@ statistic = None
 
 
 class Extract:
-    def __init__(self):
-        self.__file = config.log_file
+    def __init__(self, file_path):
+        #self.__file = config.log_file
+        self.__file = file_path
         self.dns = {}
         self.start_time = None
         self.end_time = None
 
     def extract(self):
-        with codecs.open(self.__file, "r", 'cp936') as f:
-            self.line_count = 0
-            self.lines = f.readlines()
-            print("finished read file")
-            print(time.clock())
-            return self.process_line()
+        print("extract file " + self.__file)
+        encodings = ["utf-8",'cp936','gbk']
+        for encoding in encodings:
+            try:
+                errors='strict'
+                if encoding == 'gbk':
+                    errors = 'ignore'
+                with codecs.open(self.__file, "r", encoding, errors=errors) as f:
+                    self.line_count = 0
+                    self.lines = f.readlines()
+                    break
+            except UnicodeDecodeError:
+                print("cann't read file in ", encoding, " try another")
+        else:
+            raise(Exception("cann't encode"))
+        print("finished read file")
+        print(time.clock())
+        return self.process_line()
 
     def process_line(self):
         statistic = analysis.Statistics(self.__file)
         cityService = ip_info.CityService(True)
         pattern = re.compile('https?://((\w+\.?)+)/.*')
-        ip_pattern = re.compile('^(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5]).(d{1,2}|1dd|2[0-4]d|25[0-5])$')
+        ip_pattern = re.compile('^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5]).(\d{1,2}|1\d\d|2[0-4]\d|25[0-5]).(\d{1,2}|1\d\d|2[0-4]\d|25[0-5]).(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$')
+        ip2_pattern = re.compile('\d+.\d+.\d+.\d+')
 
         res = []
         count = 0
@@ -67,16 +81,27 @@ class Extract:
             if city == None:
                 city = 'NULL'
             addr = columns[7]
-            addr_url = pattern.match(addr).group(1)
+            if pattern.match(addr):
+                addr_url = pattern.match(addr).group(1)
+            else:
+                addr_url = addr
             if ip_pattern.match(addr_url):
                 source_addr = cityService.get_city_by_ip(addr_url)
             else:
-                if self.dns.get(addr_url):
-                    source_addr = self.dns[addr_url]
-                else:
-                    source_addr = socket.getaddrinfo(addr_url, 80)[0][-1][0]
-                    source_addr = cityService.get_city_by_ip(source_addr)
+                if ip2_pattern.match(addr_url) or addr_url.startswith("http"):
+                    source_addr = None
                     self.dns[addr_url] = source_addr
+                else:
+                    try:
+                        if self.dns.get(addr_url):
+                            source_addr = self.dns[addr_url]
+                        else:
+                            source_addr = socket.getaddrinfo(addr_url, 80)[0][-1][0]
+                            source_addr = cityService.get_city_by_ip(source_addr)
+                            self.dns[addr_url] = source_addr
+                    except Exception as e:
+                        source_addr = None
+                        self.dns[addr_url] = source_addr
             extra = columns[8]
             extra = extra.strip()
             l = (datetime, explain, src_ip, name, isp, prov, city, addr_url, source_addr, extra)
@@ -123,7 +148,7 @@ class Extract:
                         properties=pika.BasicProperties(
                             content_type='application/json',
                             delivery_mode=1
-                                    ), mandatory=True)
+                                    ))
                 cnx.close()
                 if res:
                     break
@@ -305,7 +330,7 @@ def f(logs):
 
 def __main():
     print(time.clock())
-    e = Extract()
+    e = Extract(config.log_file)
     #cProfile.run('e.extract()', sort='cumulative')
     logs = e.extract()
     print("extract finished")

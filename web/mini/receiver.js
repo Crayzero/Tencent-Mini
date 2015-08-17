@@ -34,25 +34,32 @@ function f(server_index) {
                         f(server_index + 1);
                     }
                 }
-                var queue = config.task_finished;
-                ch.assertQueue(queue, {durable: false});
-                ch.consume(queue, function(msg) {
-                    var receive_msg = msg.content.toString();
-                    var receive_obj = JSON.parse(receive_msg)
-                    var redis_key = receive_obj.key;
-                    redisClient.get_key(redis_key, function (err, reply) {
-                        if (err) {
-                            console.log(err);
-                            throw(err);
-                        }
-                        res = JSON.parse(reply);
-                        reply = null;
-                        for(var i in res) {
-                            console.log(i);
-                        }
-                    })
-                    //ch.ack(msg);
-                }, {noAck: false});
+                var ex = config.task_finished;
+                ch.assertExchange(ex, 'fanout', {durable: false});
+                ch.assertQueue("", {exclusive: true}, function(err, q) {
+                    console.log("[x] Waiting for message in %s.", q.queue);
+                    ch.bindQueue(q.queue, ex, '');
+
+                    ch.consume(q.queue, function(msg) {
+                        var receive_msg = msg.content.toString();
+                        var redis_key = config.result;
+                        redisClient.get_key(redis_key, function (err, reply) {
+                            if (err) {
+                                console.log(err);
+                                throw(err);
+                            }
+                            res = JSON.parse(reply);
+                            reply = null;
+                            for(var i in res) {
+                                if (i == "processed") {
+                                    continue;
+                                }
+                                console.log(i);
+                            }
+                        });
+                        ch.ack(msg);
+                    }, {noAck: false});
+                });
             });
         }
     });

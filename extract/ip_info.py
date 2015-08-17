@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup
 import html
 import pickle
 import json
+import mysql.connector
+import config
 
 
 def get_ip_info(ip):
@@ -41,6 +43,16 @@ def get_ip_info(ip):
 
 
 def get_vedio_info(vid):
+    cnx = mysql.connector.connect(**config.mysql)
+    cursor = cnx.cursor()
+    query_state = "select * from vid_names where vid = '" + vid + "'"
+    cursor.execute(query_state)
+    row = cursor.fetchone()
+    if row:
+        video = row[1:]
+        return video
+    else:
+        return ()
     url = "http://openi.video.qq.com/fcgi-bin/vinfo?vid=%s&op_ref=xxx&appkey=xxx"
     many = False
     if isinstance(vid, str):

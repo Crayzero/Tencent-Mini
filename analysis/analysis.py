@@ -4,14 +4,13 @@
 import pandas as pd
 import numpy as np
 import sys
-sys.path.append('../extract/')
-from main import get_logs
 import ip_info
 import time
 import heapq
 import json
 import store
 import re
+import copy
 
 class Statistics:
     def __init__(self, path, host='localhost', port=6379, db=0):
@@ -21,10 +20,10 @@ class Statistics:
         self.port = port
         self.db = db
 
-    def analysis(self):
+    def analysis(self, logs):
         df = pd.DataFrame()
         print("start time is ", time.clock())
-        for log in get_logs(limit=10000):
+        for log in logs:
             print(log)
             if log[7] not in df.columns:
                 df[log[7]] = pd.Series()
@@ -70,7 +69,6 @@ class Statistics:
             res_json[prov] = {}
             prov_count = self.results[prov]['count']
             self.results[prov]['top'] = []
-            prov_heap = self.results[prov]['top']
             prov_vid_count = {}
 
             #get top 10 of all city in the prov
@@ -86,32 +84,17 @@ class Statistics:
                     if prov_vid_count.get(vid) == None:
                         prov_vid_count[vid] = 0
                     prov_vid_count[vid] += prov_count[city][vid]
-            for vid in prov_vid_count:
-                if len(prov_heap) < 300:
-                    heapq.heappush(prov_heap, (prov_vid_count[vid], vid))
-                else:
-                    if prov_vid_count[vid] > prov_heap[0][0]:
-                        heapq.heapreplace(prov_heap, (prov_vid_count[vid], vid))
 
+            res_json[prov]['count'] = prov_vid_count
             prov_vid_count = None
             prov_count = None
 
-            #get top 10 of all in the prov
-            self.results[prov]['top10'] = []
-            top300 = heapq.nlargest(300, prov_heap)
-            self.results[prov]['top10'] = self.get_valid_top10(top300)
-            prov_heap = None
-
             res_json[prov]['total'] = self.results[prov]['total']
-            res_json[prov]['top10'] = []
+            '''
             print('{', prov, ':')
-            for i in self.results[prov]['top10']:
-                #can get video name
-                #res_json[prov]['top10'].append({'name': i[1][0], 'count': i[0], 'type': i[1][1], 'PNG': i[1][2]})
-                #cann't get video name
-                res_json[prov]['top10'].append({'vid': i[1], 'count': i[0]})
             print(res_json[prov])
             print('\}')
+            '''
         json.dump(res_json, f, ensure_ascii=False, indent='\t')
         rds = store.RedisStorage(self.host, self.port, self.db)
         rds.store_top(self.file_name, res_json)
@@ -137,18 +120,22 @@ class Statistics:
                 else:
                     if city_vid_count[vid] > city_top100[0][0]:
                         heapq.heapreplace(city_top100, (city_vid_count[vid], vid))
-            city_res[city] = self.get_valid_top10(heapq.nlargest(100, city_top100))
+            city_res[city] = self.get_valid_top10(prov, heapq.nlargest(100, city_top100))
         return city_res
 
-    def get_valid_top10(self, top):
+    def get_valid_top10(self, prov, top):
         res = []
         top10_count = 0
         for i in top:
             #can get video name
             '''
             vid_name = ip_info.get_vedio_info(i[1])
+            if not vid_name:
+                continue
+            print(vid_name)
             if self.is_valid(vid_name[0]):
                 top10_count += 1
+                res.append((i[0], vid_name))
                 self.results[prov]['top10'].append((i[0], vid_name))
             '''
             #cann't get video name
@@ -157,17 +144,6 @@ class Statistics:
                 break
             res.append((i[0], i[1]))
         return res
-
-    def is_valid(self, name):
-        if re.match('\d+\w+', name):
-            return False
-        if re.match('[a-z]+\d+', name):
-            return False
-        if re.match('\w+.flv\Z', name):
-            return False
-        if re.match('预告片.*', name):
-            return False
-        return True
 
 if __name__ == '__main__':
     analysis()

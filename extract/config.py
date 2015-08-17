@@ -12,6 +12,9 @@ mysql = {
     'charset': 'utf8'
 }
 
+rabbitmq_servers = [{
+    "host": "localhost"},]
+
 redis_servers = [
         {
             "host": 'localhost',

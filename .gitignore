@@ -3,3 +3,5 @@ src-logs/*
 extract/output.txt
 *.lprof
 web/mini/node_modules/*
+*.tar.gz
+dispatch/processed.txt
