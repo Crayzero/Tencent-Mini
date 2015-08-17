@@ -35,7 +35,7 @@ class Rsync:
                     self.report_new_file(src_base_path + file)
                 self.new_processed[file] = 1
         f = open('processed.txt', 'w')
-        json.dump(self.new_processed, f)
+        json.dump(self.new_processed, f, indent='\t')
         self.processed = None
         self.new_processed = None
 

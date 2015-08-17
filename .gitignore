@@ -5,3 +5,4 @@ extract/output.txt
 web/mini/node_modules/*
 *.tar.gz
 dispatch/processed.txt
+reducer/output.txt

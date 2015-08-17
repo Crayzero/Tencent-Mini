@@ -108,7 +108,7 @@ class Extract:
             extra = columns[8]
             extra = extra.strip()
             l = (datetime, explain, src_ip, name, isp, prov, city, addr_url, source_addr, extra)
-            res.append(l)
+            #res.append(l)
             statistic.count(l)
             l = None
             datetime = None
@@ -122,12 +122,13 @@ class Extract:
             source_addr = None
             extra = None
             line = None
-        self.lines = None
         pattern = None
         ip_pattern = None
         cityService.destory()
         cityService = None
-        statistic.get_top()
+        if len(self.lines) > 0:
+            statistic.get_top()
+        self.lines = None
         self.report_finish()
         return res
 

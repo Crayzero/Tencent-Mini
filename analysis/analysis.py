@@ -3,14 +3,11 @@
 
 import pandas as pd
 import numpy as np
-import sys
-import ip_info
 import time
 import heapq
 import json
 import store
-import re
-import copy
+import datetime
 
 class Statistics:
     def __init__(self, path, host='localhost', port=6379, db=0):
@@ -19,6 +16,8 @@ class Statistics:
         self.host = host
         self.port = port
         self.db = db
+        self.last_time = None
+        self.count_per_five_second = 0
 
     def analysis(self, logs):
         df = pd.DataFrame()
@@ -42,8 +41,30 @@ class Statistics:
                 print(tmp[j])
 
     def count(self, l):
+        cur_time = datetime.datetime.strptime(l[0], '%Y-%m-%d %H:%M:%S')
+        if self.last_time == None:
+            self.last_time = cur_time
+            self.results['count_per_five_second'] = []
+        if (cur_time - self.last_time).seconds < 5:
+            self.count_per_five_second += 1
+        else:
+            self.results['count_per_five_second'].append(self.count_per_five_second)
+            self.last_time = cur_time
+            self.count_per_five_second = 1
         prov = l[5]
         city = l[6]
+        source_city = l[8]
+        if source_city != None:
+            if self.results.get('source') == None:
+                self.results['source'] = {}
+            if self.results['source'].get(source_city) == None:
+                self.results['source'][source_city] = {}
+                self.results['source'][source_city]['total'] = 0
+            if self.results['source'][source_city].get(city) == None:
+                self.results['source'][source_city][city] = 0
+            self.results['source'][source_city][city] += 1
+            self.results['source'][source_city]['total'] += 1
+
         if self.results.get(prov) == None:
             self.results[prov] = {}
             self.results[prov]['count'] = {}
@@ -59,12 +80,20 @@ class Statistics:
         city_count[vid] += 1
         l = None
 
-
     def get_top(self):
-        f = open('output.txt', 'w+')
+        if self.results.get('count_per_five_second') == None:
+            self.results['count_per_five_second'] = []
+        else:
+            self.results['count_per_five_second'].append(self.count_per_five_second)
         res_json = {}
+        res_json['count_per_five_second'] = self.results['count_per_five_second']
+        res_json['source'] = self.results['source']
         for prov in self.results:
             if prov == '默认':
+                continue
+            if prov == 'count_per_five_second':
+                continue
+            if prov == 'source':
                 continue
             res_json[prov] = {}
             prov_count = self.results[prov]['count']
@@ -95,12 +124,10 @@ class Statistics:
             print(res_json[prov])
             print('\}')
             '''
-        json.dump(res_json, f, ensure_ascii=False, indent='\t')
         rds = store.RedisStorage(self.host, self.port, self.db)
         rds.store_top(self.file_name, res_json)
         res_json = None
         self.results = None
-        f.close()
 
     def get_top_in_city(self, prov):
         prov_vid_count = self.results[prov]['count']

@@ -25,7 +25,7 @@ class Reduce:
         self.queue = 'task_finished'
         self.redis_client = store.RedisStorage()
         self.redis_final_result_key = "result"
-        self.total = 12
+        self.total = 28
         pass
 
     def callback(self, ch, method, properties, body):
@@ -86,11 +86,16 @@ class Reduce:
             self.redis_client.store(log_num, json.dumps(res))
         else:
             print(res["processed"])
-            if logfile_ip in res["processed"]:
+            if logfile_ip in res["processed"] or map_result == None:
                 print("log_file " + logfile_ip + '_' + log_num + " has been processed")
             else:
+                res['count_per_five_second'] += map_result['count_per_five_second']
                 for prov in map_result:
                     if prov == 'processed':
+                        continue
+                    if prov == 'count_per_five_second':
+                        continue
+                    if prov == 'source':
                         continue
                     map_result_prov = map_result[prov]
                     if res.get(prov) == None:
@@ -106,6 +111,8 @@ class Reduce:
                         if  prov_one_vid_sum > 1:
                             res[prov]['count'][vid] = prov_one_vid_sum
                     for city in map_result_prov['city']:
+                        if city == None:
+                            continue
                         if res[prov]['city'].get(city) == None:
                             res[prov]['city'][city] = {}
                         if res[prov]['city'][city].get('count') == None:
@@ -113,6 +120,22 @@ class Reduce:
                         prov_city_sum = res[prov]['city'][city]['count'] + map_result_prov['city'][city]['count']
                         if prov_city_sum > 1:
                             res[prov]['city'][city]['count'] = prov_city_sum
+
+                for source_city in map_result['source']:
+                    if res['source'].get(source_city) == None:
+                        res['source'][source_city] = map_result['source'][source_city]
+                    else:
+                        if res['source'][source_city].get('total') == None:
+                            res['source'][source_city]['total'] = 0
+                        res['source'][source_city]['total'] += map_result['source'][source_city]['total']
+                        for to_city in map_result['source'][source_city]:
+                            if res['source'][source_city].get(to_city) == None:
+                                res['source'][source_city][to_city] = map_result['source'][source_city][to_city]
+                            else:
+                                res['source'][source_city][to_city] += map_result['source'][source_city][to_city]
+                            if res['source'][source_city][to_city] < 10:
+                                res['source'][source_city].pop(to_city)
+
                 res["processed"].append(logfile_ip)
         if self.reduced_all(res):
             self.report_new_result(res, log_num)
@@ -126,13 +149,26 @@ class Reduce:
             for prov in res:
                 if prov == 'processed':
                     continue
+                if prov == '未知':
+                    continue
+                if prov == 'count_per_five_second':
+                    continue
+                if prov == 'source':
+                    continue
                 prov_top300 = self.get_top300(res[prov]['count'])
                 print('{ prov: ', prov)
                 prov_top10 = self.get_valid_top10(prov_top300)
                 #print(prov_top10)
                 print('}\n')
                 res[prov]['count'] = None
+                res[prov].pop('count')
                 res[prov]['top10'] = prov_top10
+            for city in res['source']:
+                source_city_top_10 = self.get_source_top10(res['source'][city])
+                total = res['source'][city]['total']
+                res['source'][city] = {}
+                res['source'][city]['top10'] = source_city_top_10
+                res['source'][city]['total'] = total
             return True
         return False
 
@@ -140,7 +176,13 @@ class Reduce:
         processed = {}
         processed['processed'] = res['processed']
         res['processed'] = None
+        if res.get('未知') != None:
+            res.pop('未知')
+        res.pop('processed')
         self.redis_client.store(self.redis_final_result_key, json.dumps(res))
+        f = open('output.txt', 'w')
+        json.dump(res, f, ensure_ascii=False, indent='\t')
+        f.close()
         res = None
         self.redis_client.store(log_num, json.dumps(processed), 300)
 
@@ -165,6 +207,16 @@ class Reduce:
         top300 = heapq.nlargest(300, vid_counts_heap)
         vid_counts_heap = None
         return top300
+
+    def get_source_top10(self, sources):
+        source_count_heap = []
+        for city in sources:
+            if len(source_count_heap) < 10:
+                heapq.heappush(source_count_heap, (sources[city], city))
+            else:
+                if sources[city] > source_count_heap[0][0]:
+                    heapq.heapreplace(source_count_heap, (sources[city], city))
+        return heapq.nlargest(10, source_count_heap)
 
     def get_valid_top10(self, tops):
         res = []
