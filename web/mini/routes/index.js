@@ -45,9 +45,11 @@ router.get('/flow', function (req, res, next) {
         else {
             var result = JSON.parse(reply);
             reply = null;
-            result = result['source'];
-            for (var city in result) {
-                console.log(city, result[city]['total']);
+            if (result != null) {
+                result = result['source'];
+                for (var city in result) {
+                    console.log(city, result[city]['total']);
+                }
             }
             res.type('application/json');
             res.json(result);

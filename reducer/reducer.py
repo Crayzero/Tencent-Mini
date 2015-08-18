@@ -25,7 +25,7 @@ class Reduce:
         self.queue = 'task_finished'
         self.redis_client = store.RedisStorage()
         self.redis_final_result_key = "result"
-        self.total = 28
+        self.total = 31
         pass
 
     def callback(self, ch, method, properties, body):
@@ -36,7 +36,10 @@ class Reduce:
             except Exception as e:
                 print(e)
                 ch.basic_reject(delivery_tag=method.delivery_tag)
+            print(msg)
             key = msg['key']
+            start_time = msg['start_time']
+            end_time = msg['end_time']
             print(key)
             logfile_ip = key.split('_')[0]
             log_num = key.split('_')[1]
@@ -51,12 +54,12 @@ class Reduce:
                     break
 
             map_result = self.redis_client.get_map_result(key)
-            if map_result !=  None:
-                self.union(map_result, logfile_ip, log_num)
+            self.union(map_result, logfile_ip, log_num, start_time, end_time)
             self.redis_client.delete(key)
             map_result = None
             ch.basic_ack(delivery_tag = method.delivery_tag)
         except Exception as e:
+            #ch.basic_ack(delivery_tag = method.delivery_tag)
             ch.basic_reject(delivery_tag=method.delivery_tag)
             raise(e)
         finally:
@@ -76,20 +79,30 @@ class Reduce:
         print("waiting for result")
         channel.start_consuming()
 
-    def union(self, map_result, logfile_ip, log_num):
+    def union(self, map_result, logfile_ip, log_num, start_time, end_time):
         print("union to ", log_num)
         res = self.redis_client.get_map_result(log_num)
         if res is None:
             res = map_result
+            if res == None:
+                res = {}
             res["processed"] = []
             res["processed"].append(logfile_ip)
+            res['time'] = {}
+            res['time']['start_time'] = start_time
+            res['time']['end_time'] = end_time
             self.redis_client.store(log_num, json.dumps(res))
         else:
             print(res["processed"])
-            if logfile_ip in res["processed"] or map_result == None:
+            if logfile_ip in res["processed"]:
                 print("log_file " + logfile_ip + '_' + log_num + " has been processed")
+            elif map_result == None:
+                res["processed"].append(logfile_ip)
             else:
-                res['count_per_five_second'] += map_result['count_per_five_second']
+                print(len(res['count_per_five_second']))
+                for i in range(min(len(map_result['count_per_five_second']), 60)):
+                    res['count_per_five_second'][i] += map_result['count_per_five_second'][i]
+
                 for prov in map_result:
                     if prov == 'processed':
                         continue
@@ -110,6 +123,8 @@ class Reduce:
                         prov_one_vid_sum = res[prov]['count'][vid] + map_result_prov['count'][vid]
                         if  prov_one_vid_sum > 1:
                             res[prov]['count'][vid] = prov_one_vid_sum
+                        else:
+                            res[prov]['count'].pop(vid)
                     for city in map_result_prov['city']:
                         if city == None:
                             continue
@@ -154,6 +169,8 @@ class Reduce:
                 if prov == 'count_per_five_second':
                     continue
                 if prov == 'source':
+                    continue
+                if prov == 'time':
                     continue
                 prov_top300 = self.get_top300(res[prov]['count'])
                 print('{ prov: ', prov)
@@ -211,6 +228,10 @@ class Reduce:
     def get_source_top10(self, sources):
         source_count_heap = []
         for city in sources:
+            if city == 'total':
+                continue
+            if city == '未知':
+                continue
             if len(source_count_heap) < 10:
                 heapq.heappush(source_count_heap, (sources[city], city))
             else:

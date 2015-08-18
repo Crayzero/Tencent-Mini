@@ -24,8 +24,8 @@ redis_servers = [
 ]
 
 prov_to_table = {
-        "湖北": "logs_hubei",
-        "北京": "logs_beijing",
+        "湖北": "hubei",
+        "北京": "beijing",
         "广东": "logs_guangdong",
         "湖南": "logs_hunan",
         "四川": "logs_sichuan",

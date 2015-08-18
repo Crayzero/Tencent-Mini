@@ -54,7 +54,6 @@ function f(server_index) {
                                 if (i == "processed") {
                                     continue;
                                 }
-                                console.log(i);
                             }
                         });
                         ch.ack(msg);

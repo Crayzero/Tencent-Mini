@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-rsync_src = ['/data/tencent-mini/*.tar.gz',]
+rsync_src = ['/data/tencent-mini/test/*.tar.gz',]
 rsync_dst = ['./logs/',]
 
 queue = "new_file"

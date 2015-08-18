@@ -74,8 +74,14 @@ class Worker:
                 return
         except (OSError, pika.exceptions.ConnectionClosed) as err:
             #ch.basic_reject(delivery_tag=method.delivery_tag)
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+            os.remove(new_file_path);
+            f = open("../src-logs/" + tarinfo.name, 'w')
+            f.close()
             print(err)
+            e = main.Extract("../src-logs/" + tarinfo.name)
+            e.extract()
+            os.remove("../src-logs/" + tarinfo.name)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return ;
 
 
