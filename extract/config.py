@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-log_file = "../src-logs/10.130.28.214_20150720169"
+log_file = "../src-logs/10.231.144.78_20150810233"
 
 mysql = {
     'user': 'root',

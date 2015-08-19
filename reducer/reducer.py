@@ -82,7 +82,7 @@ class Reduce:
     def union(self, map_result, logfile_ip, log_num, start_time, end_time):
         print("union to ", log_num)
         res = self.redis_client.get_map_result(log_num)
-        if res is None:
+        if res is None or len(res) == 0:
             res = map_result
             if res == None:
                 res = {}
@@ -96,7 +96,7 @@ class Reduce:
             print(res["processed"])
             if logfile_ip in res["processed"]:
                 print("log_file " + logfile_ip + '_' + log_num + " has been processed")
-            elif map_result == None:
+            elif map_result == None or len(map_result) == 0:
                 res["processed"].append(logfile_ip)
             else:
                 print(len(res['count_per_five_second']))
@@ -144,6 +144,8 @@ class Reduce:
                             res['source'][source_city]['total'] = 0
                         res['source'][source_city]['total'] += map_result['source'][source_city]['total']
                         for to_city in map_result['source'][source_city]:
+                            if to_city == 'total':
+                                continue
                             if res['source'][source_city].get(to_city) == None:
                                 res['source'][source_city][to_city] = map_result['source'][source_city][to_city]
                             else:
@@ -161,6 +163,7 @@ class Reduce:
         if len(res['processed']) == self.total:
             if len(res) == 1:
                 return True
+            country_top = {}
             for prov in res:
                 if prov == 'processed':
                     continue
@@ -173,6 +176,9 @@ class Reduce:
                 if prov == 'time':
                     continue
                 prov_top300 = self.get_top300(res[prov]['count'])
+
+                self.get_country_top(country_top, prov_top300)
+
                 print('{ prov: ', prov)
                 prov_top10 = self.get_valid_top10(prov_top300)
                 #print(prov_top10)
@@ -180,6 +186,10 @@ class Reduce:
                 res[prov]['count'] = None
                 res[prov].pop('count')
                 res[prov]['top10'] = prov_top10
+            country_top300 = self.get_top300(country_top)
+            country_top10 = self.get_valid_top10(country_top300)
+            res['top10'] = country_top10
+
             for city in res['source']:
                 source_city_top_10 = self.get_source_top10(res['source'][city])
                 total = res['source'][city]['total']
@@ -224,6 +234,14 @@ class Reduce:
         top300 = heapq.nlargest(300, vid_counts_heap)
         vid_counts_heap = None
         return top300
+
+    def get_country_top(self, country_top, prov_top300):
+        for i in prov_top300:
+            if country_top.get(i[1]) == None:
+                country_top[i[1]] = i[0]
+            else:
+                country_top[i[1]] += i[0]
+
 
     def get_source_top10(self, sources):
         source_count_heap = []

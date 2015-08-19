@@ -53,7 +53,7 @@ def get_vedio_info(vid):
         return video
     else:
         return ()
-    url = "http://openi.video.qq.com/fcgi-bin/vinfo?vid=%s&op_ref=xxx&appkey=xxx"
+    url = "http://openi.video.qq.com/fcgi-bin/vinfo?vid=%s&op_ref=apd_video&op_key=bbd83b2ce8a946bd462385dbef7a776d"
     many = False
     if isinstance(vid, str):
         pass

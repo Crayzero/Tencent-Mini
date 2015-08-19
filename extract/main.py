@@ -26,43 +26,45 @@ statistic = None
 
 
 class Extract:
-    def __init__(self, file_path):
+    def __init__(self):
         #self.__file = config.log_file
-        self.__file = file_path
         self.dns = {}
         self.start_time = None
         self.end_time = None
+        self.cityService = ip_info.CityService(True)
 
-    def extract(self):
+    def extract(self, file_path):
+        self.__file = file_path
         print("extract file " + self.__file)
-        encodings = ["utf-8",'cp936','gbk']
+        encodings = ['cp936', 'gbk', 'utf-8']
         for encoding in encodings:
             try:
                 errors='strict'
-                if encoding == 'gbk':
+                if encoding == 'gbk' or encoding == 'cp936':
                     errors = 'ignore'
-                with codecs.open(self.__file, "r", encoding, errors=errors) as f:
-                    self.line_count = 0
-                    self.lines = f.readlines()
-                    break
+                print(encoding)
+                f = codecs.open(self.__file, "r", encoding, errors=errors)
+                self.line_count = 0
+                self._file = f
+                break
             except UnicodeDecodeError:
                 print("cann't read file in ", encoding, " try another")
         else:
             raise(Exception("cann't encode"))
         print("finished read file")
         print(time.clock())
-        return self.process_line()
+        self.process_line()
 
     def process_line(self):
         statistic = analysis.Statistics(self.__file)
-        cityService = ip_info.CityService(True)
         pattern = re.compile('https?://((\w+\.?)+)/.*')
         ip_pattern = re.compile('^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5]).(\d{1,2}|1\d\d|2[0-4]\d|25[0-5]).(\d{1,2}|1\d\d|2[0-4]\d|25[0-5]).(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$')
         ip2_pattern = re.compile('\d+.\d+.\d+.\d+')
 
         res = []
         count = 0
-        for line in self.lines:
+        #for line in self.lines:
+        for line in self._file:
             count += 1
             if count >= 100000:
                 pass
@@ -78,7 +80,7 @@ class Extract:
                 name = columns[4].split('.')[0]
                 isp = columns[5]
                 prov = columns[6]
-                city = cityService.get_city_by_ip(src_ip)
+                city = self.cityService.get_city_by_ip(src_ip)
                 if city == None:
                     city = 'NULL'
                 addr = columns[7]
@@ -89,7 +91,7 @@ class Extract:
             else:
                 addr_url = addr
             if ip_pattern.match(addr_url):
-                source_addr = cityService.get_city_by_ip(addr_url)
+                source_addr = self.cityService.get_city_by_ip(addr_url)
             else:
                 if ip2_pattern.match(addr_url) or addr_url.startswith("http"):
                     source_addr = None
@@ -100,7 +102,7 @@ class Extract:
                             source_addr = self.dns[addr_url]
                         else:
                             source_addr = socket.getaddrinfo(addr_url, 80)[0][-1][0]
-                            source_addr = cityService.get_city_by_ip(source_addr)
+                            source_addr = self.cityService.get_city_by_ip(source_addr)
                             self.dns[addr_url] = source_addr
                     except Exception as e:
                         source_addr = None
@@ -124,11 +126,13 @@ class Extract:
             line = None
         pattern = None
         ip_pattern = None
-        cityService.destory()
-        cityService = None
-        if len(self.lines) > 0:
-            statistic.get_top()
-        self.lines = None
+
+        #self.cityService.destory()
+        #self.cityService = None
+
+        statistic.get_top()
+        #self.lines = None
+        self._file.close()
         self.report_finish()
         return res
 
@@ -334,9 +338,9 @@ def f(logs):
 
 def __main():
     print(time.clock())
-    e = Extract(config.log_file)
+    e = Extract()
     #cProfile.run('e.extract()', sort='cumulative')
-    logs = e.extract()
+    logs = e.extract(config.log_file)
     print("extract finished")
     print(time.clock())
     #print("logs length is ", len(logs))

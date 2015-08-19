@@ -41,7 +41,11 @@ class Statistics:
                 print(tmp[j])
 
     def count(self, l):
-        cur_time = datetime.datetime.strptime(l[0], '%Y-%m-%d %H:%M:%S')
+        #cur_time = datetime.datetime.strptime(l[0], '%Y-%m-%d %H:%M:%S')
+        date, time = l[0].split()
+        year, month, day = date.split('-')
+        hour, minute, second = time.split(':')
+        cur_time = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
         if self.last_time == None:
             self.last_time = cur_time
             self.results['count_per_five_second'] = []
@@ -81,6 +85,11 @@ class Statistics:
         l = None
 
     def get_top(self):
+        if len(self.results) == 0:
+            rds = store.RedisStorage(self.host, self.port, self.db)
+            rds.store_top(self.file_name, {})
+            return
+
         if self.results.get('count_per_five_second') == None:
             self.results['count_per_five_second'] = []
         else:

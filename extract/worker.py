@@ -5,7 +5,6 @@ import pika
 import config
 import subprocess
 import tarfile
-import io
 import os
 import main
 import time
@@ -15,6 +14,7 @@ class Worker:
         self.cnx = None
         self.channel = None
         self.connect()
+        self.e = main.Extract()
 
     def connect(self):
         for rabbitmq_server in config.rabbitmq_servers:
@@ -48,7 +48,6 @@ class Worker:
         print(rsync_statement)
         try:
             code = subprocess.call(rsync_statement, shell=True)
-            print(code)
             if code == 0:
                 file_name = file_path.split('/')[-1]
                 new_file_path = "../src-logs/" + file_name;
@@ -58,8 +57,7 @@ class Worker:
                         for tarinfo in tar_file:
                             print(tarinfo.name, " is ", tarinfo.size , " bytes")
                             tar_file.extract(tarinfo, path='../src-logs/')
-                            e = main.Extract("../src-logs/" + tarinfo.name)
-                            e.extract()
+                            self.e.extract("../src-logs/" + tarinfo.name)
                             print("extract file ", file_path, " finished. ", time.clock())
                             os.remove('../src-logs/' + tarinfo.name)
                         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -69,8 +67,8 @@ class Worker:
                 except tarfile.ReadError:
                     print("read tarfile error")
             else:
-                #ch.basic_reject(delivery_tag=method.delivery_tag)
-                ch.basic_ack(delivery_tag=method.delivery_tag)
+                ch.basic_reject(delivery_tag=method.delivery_tag)
+                #ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
         except (OSError, pika.exceptions.ConnectionClosed) as err:
             #ch.basic_reject(delivery_tag=method.delivery_tag)
@@ -78,8 +76,8 @@ class Worker:
             f = open("../src-logs/" + tarinfo.name, 'w')
             f.close()
             print(err)
-            e = main.Extract("../src-logs/" + tarinfo.name)
-            e.extract()
+            e = main.Extract()
+            e.extract("../src-logs/" + tarinfo.name)
             os.remove("../src-logs/" + tarinfo.name)
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return ;

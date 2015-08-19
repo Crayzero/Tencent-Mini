@@ -6,9 +6,6 @@ var convert_table = require('./convert');
 var locations = require('./location');
 
 /* GET home page. */
-router.get('/', function(req, res, next) {
-  res.render('index', { title: 'Express' });
-});
 
 router.get('/prov(/all)?', function (req, res, next) {
     var result = null;
@@ -21,6 +18,11 @@ router.get('/prov(/all)?', function (req, res, next) {
             var result = JSON.parse(reply);
             reply = null;
             var whole_country = {};
+            if (result == null) {
+                res.type('application/json');
+                res.json({});
+            }
+            var top10 = result.top10;
             for (var i in result) {
                 if (i == 'count_per_five_second') {
                     continue;
@@ -29,6 +31,9 @@ router.get('/prov(/all)?', function (req, res, next) {
                     continue;
                 }
                 else if (i == 'time') {
+                    continue;
+                }
+                else if (i == 'top10') {
                     continue;
                 }
                 for (var city in result[i]['city']) {
@@ -43,6 +48,9 @@ router.get('/prov(/all)?', function (req, res, next) {
                     }
                 }
             }
+            result = null;
+            result = {};
+            result['top10'] = top10;
             var whole_res = []
             for(var city in whole_country) {
                 if (typeof locations[city] === 'undefined') {
@@ -53,8 +61,9 @@ router.get('/prov(/all)?', function (req, res, next) {
                             geoCoord:[locations[city].lnt, locations[city].lat],
                         });
             }
+            result['citys'] = whole_res;
             res.type('application/json');
-            res.json(whole_res);
+            res.json(result);
         }
     });
 });
@@ -70,8 +79,7 @@ router.param('prov', function (req, res, next, prov) {
         if (typeof prov_chinese === 'undefined') {
             prov_chinese = prov;
         }
-        console.log(prov_chinese);
-        if (typeof reply_json[prov_chinese] === 'undefined') {
+        if (reply_json == null || typeof reply_json[prov_chinese] === 'undefined') {
             res.type('application/json');
             res.json({});
         }
@@ -85,7 +93,6 @@ router.param('prov', function (req, res, next, prov) {
                     continue;
                 }
                 if (locations[city].prov != prov_chinese) {
-                    console.log(city);
                     continue;
                 }
                 citys_data.push({name: city,

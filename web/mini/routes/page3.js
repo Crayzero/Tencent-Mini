@@ -5,9 +5,6 @@ var redisClient = require('../redisClient');
 var convert_table = require('./convert');
 
 /* GET home page. */
-router.get('/', function(req, res, next) {
-  res.render('index', { title: 'Express' });
-});
 
 router.get('/city(/all)?', function (req, res, next) {
     redisClient.get('result', function(err, reply) {
@@ -28,6 +25,9 @@ router.get('/city(/all)?', function (req, res, next) {
                 var flow_point = [];
                 var flow_data_json = [];
                 for (var src_city in flow) {
+                    if (flow[city]['total'] < 10) {
+                        continue;
+                    }
                     flow[src_city]['top10'].forEach(function(item, index) {
                         flow_point.push([{name: src_city}, {name: item[1]}]);
                         if (typeof flow_data_json[item[1]] === 'undefined') {
@@ -52,7 +52,6 @@ router.get('/city(/all)?', function (req, res, next) {
 });
 
 router.param('city', function(req, res, next, city) {
-    console.log(city);
     redisClient.get('result', function (err, reply) {
         if (err) {
             console.log(err);
@@ -64,7 +63,6 @@ router.param('city', function(req, res, next, city) {
                 city_chinese = city;
             }
             var result = JSON.parse(reply);
-            console.log(city_chinese);
             var city_source = result['source'][city_chinese];
             result = null;
             reply = null;
@@ -86,6 +84,7 @@ router.param('city', function(req, res, next, city) {
         }
     });
 });
+
 router.get('/city/:city', function (req, res, next) {
     next.end();
 });

@@ -28,7 +28,6 @@ router.get('/prov', function (req, res, next) {
                 if (i == 'source') {
                     continue;
                 }
-                console.log(i);
             }
             res.type('application/json');
             res.json(result);
@@ -48,7 +47,7 @@ router.get('/flow', function (req, res, next) {
             if (result != null) {
                 result = result['source'];
                 for (var city in result) {
-                    console.log(city, result[city]['total']);
+                    //console.log(city, result[city]['total']);
                 }
             }
             res.type('application/json');

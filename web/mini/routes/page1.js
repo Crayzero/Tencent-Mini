@@ -6,9 +6,6 @@ var Heap = require('heap');
 var fs = require('fs');
 
 /* GET home page. */
-router.get('/', function(req, res, next) {
-  res.render('index', { title: 'Express' });
-});
 
 router.get('/prov/all', function (req, res, next) {
     var result = null;
@@ -34,7 +31,12 @@ router.get('/prov/all', function (req, res, next) {
                 }
                 data.push({name: i, value: result[i]['total']});
             }
-            console.log(data);
+            if (data.length == 0) {
+                res.type('application/json');
+                res.json({});
+                res.end();
+                return ;
+            }
             var top10 = Heap.nlargest(data, 10, function (a,b) {
                 return a.value - b.value;
             });
