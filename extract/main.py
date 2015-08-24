@@ -72,9 +72,10 @@ class Extract:
             try:
                 columns = line.split("\t")
                 datetime = columns[1]
-                if self.start_time == None:
+                if self.start_time == None or datetime < self.start_time:
                     self.start_time = datetime
-                self.end_time = datetime
+                if self.end_time == None or datetime > self.end_time:
+                    self.end_time = datetime
                 explain = columns[2]
                 src_ip = columns[3]
                 name = columns[4].split('.')[0]
@@ -82,7 +83,8 @@ class Extract:
                 prov = columns[6]
                 city = self.cityService.get_city_by_ip(src_ip)
                 if city == None:
-                    city = 'NULL'
+                    pass
+                    #city = 'NULL'
                 addr = columns[7]
             except IndexError:
                 continue
@@ -113,16 +115,6 @@ class Extract:
             #res.append(l)
             statistic.count(l)
             l = None
-            datetime = None
-            explain = None
-            src_ip = None
-            name = None
-            isp = None
-            prov = None
-            city = None
-            addr_url = None
-            source_addr = None
-            extra = None
             line = None
         pattern = None
         ip_pattern = None
@@ -142,6 +134,8 @@ class Extract:
         msg = {}
         msg["start_time"] = self.start_time
         msg['end_time'] = self.end_time
+        self.start_time = None
+        self.end_time = None
         msg['key'] = os.path.basename(self.__file)
         msg = json.dumps(msg)
         while True:

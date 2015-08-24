@@ -6,3 +6,5 @@ web/mini/node_modules/*
 *.tar.gz
 dispatch/processed.txt
 reducer/output.txt
+*.txt
+web/mini/routes/page1.json

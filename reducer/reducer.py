@@ -14,6 +14,7 @@ sys.path.append("../analysis")
 import store
 import heapq
 import re
+import datetime
 
 
 class Reduce:
@@ -81,6 +82,14 @@ class Reduce:
 
     def union(self, map_result, logfile_ip, log_num, start_time, end_time):
         print("union to ", log_num)
+        processed = False
+        if start_time is not None:
+            start_time_date = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        if end_time is not None:
+            end_time_date = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        if start_time is not None:
+            print((end_time_date - start_time_date).seconds)
+
         res = self.redis_client.get_map_result(log_num)
         if res is None or len(res) == 0:
             res = map_result
@@ -89,16 +98,27 @@ class Reduce:
             res["processed"] = []
             res["processed"].append(logfile_ip)
             res['time'] = {}
-            res['time']['start_time'] = start_time
-            res['time']['end_time'] = end_time
+            if start_time is not None and (end_time_date - start_time_date).seconds == 299:
+                res['time']['start_time'] = start_time
+                res['time']['end_time'] = end_time
             self.redis_client.store(log_num, json.dumps(res))
         else:
             print(res["processed"])
+
             if logfile_ip in res["processed"]:
                 print("log_file " + logfile_ip + '_' + log_num + " has been processed")
+                processed = True
             elif map_result == None or len(map_result) == 0:
                 res["processed"].append(logfile_ip)
             else:
+                if res.get('time') is None:
+                    res['time'] = {}
+                if len(res['time']) == 0 and start_time is not None and (end_time_date - start_time_date).seconds == 299:
+                    res['time']['start_time'] = start_time
+                    res['time']['end_time'] = end_time
+
+                if res.get('count_per_five_second') == None:
+                    res['count_per_five_second'] = [0] * 60
                 print(len(res['count_per_five_second']))
                 for i in range(min(len(map_result['count_per_five_second']), 60)):
                     res['count_per_five_second'][i] += map_result['count_per_five_second'][i]
@@ -117,6 +137,7 @@ class Reduce:
                         res[prov]['count'] = {}
                         res[prov]['city'] = {}
                     res[prov]['total'] += map_result_prov['total']
+                    #merge the vid and count of vid
                     for vid in map_result_prov['count']:
                         if res[prov]['count'].get(vid) == None:
                             res[prov]['count'][vid] = 0
@@ -125,6 +146,8 @@ class Reduce:
                             res[prov]['count'][vid] = prov_one_vid_sum
                         else:
                             res[prov]['count'].pop(vid)
+
+                    #for each city in prov, merge the total count in city
                     for city in map_result_prov['city']:
                         if city == None:
                             continue
@@ -137,6 +160,8 @@ class Reduce:
                             res[prov]['city'][city]['count'] = prov_city_sum
 
                 for source_city in map_result['source']:
+                    if res.get('source') == None:
+                        res['source'] = {}
                     if res['source'].get(source_city) == None:
                         res['source'][source_city] = map_result['source'][source_city]
                     else:
@@ -154,10 +179,13 @@ class Reduce:
                                 res['source'][source_city].pop(to_city)
 
                 res["processed"].append(logfile_ip)
-        if self.reduced_all(res):
-            self.report_new_result(res, log_num)
-        else:
-            self.redis_client.store(log_num, json.dumps(res))
+
+        if not processed:
+            if self.reduced_all(res):
+                print('union all')
+                self.report_new_result(res, log_num)
+            else:
+                self.redis_client.store(log_num, json.dumps(res))
 
     def reduced_all(self, res):
         if len(res['processed']) == self.total:
@@ -181,15 +209,32 @@ class Reduce:
 
                 print('{ prov: ', prov)
                 prov_top10 = self.get_valid_top10(prov_top300)
-                #print(prov_top10)
                 print('}\n')
-                res[prov]['count'] = None
-                res[prov].pop('count')
+                #res[prov]['count'] = None
+                #res[prov].pop('count')
                 res[prov]['top10'] = prov_top10
             country_top300 = self.get_top300(country_top)
-            country_top10 = self.get_valid_top10(country_top300)
-            res['top10'] = country_top10
+            country_top10_vid = []
+            country_top10 = self.get_valid_top10(country_top300, country_top10_vid)
+            print(country_top10_vid)
+            prov_vid_counts = {}
+            for vid in country_top10_vid:
+                prov_vid_counts[vid] = {}
+                for prov in res:
+                    if isinstance(res[prov], dict) and res[prov].get('count') is not None:
+                        if res[prov]['count'].get(vid) is not None:
+                            prov_vid_counts[vid][prov] = res[prov]['count'][vid]
 
+            for prov in res:
+                if isinstance(res[prov], dict) and res[prov].get('count') is not None:
+                    res[prov].pop('count')
+
+            res['top10'] = {}
+            res['top10']['name'] = country_top10
+            res['top10']['distribute'] = prov_vid_counts
+
+            if res.get('source') is None:
+                res['source'] = {}
             for city in res['source']:
                 source_city_top_10 = self.get_source_top10(res['source'][city])
                 total = res['source'][city]['total']
@@ -203,13 +248,19 @@ class Reduce:
         processed = {}
         processed['processed'] = res['processed']
         res['processed'] = None
+        res['extra'] = {}
+        res['extra']['log_num'] = log_num
         if res.get('未知') != None:
             res.pop('未知')
         res.pop('processed')
         self.redis_client.store(self.redis_final_result_key, json.dumps(res))
+
+        ''' write result to a file
         f = open('output.txt', 'w')
         json.dump(res, f, ensure_ascii=False, indent='\t')
         f.close()
+        '''
+
         res = None
         self.redis_client.store(log_num, json.dumps(processed), 300)
 
@@ -250,23 +301,32 @@ class Reduce:
                 continue
             if city == '未知':
                 continue
-            if len(source_count_heap) < 10:
+            if city == None or city == 'NULL':
+                continue
+            if len(source_count_heap) < 30:
                 heapq.heappush(source_count_heap, (sources[city], city))
             else:
                 if sources[city] > source_count_heap[0][0]:
                     heapq.heapreplace(source_count_heap, (sources[city], city))
-        return heapq.nlargest(10, source_count_heap)
+        return heapq.nlargest(30, source_count_heap)
 
-    def get_valid_top10(self, tops):
+    def get_valid_top10(self, tops, top10_vid=None):
+        if top10_vid is None:
+            top10_vid = []
+
         res = []
         top10_count = 0
+        f = open("vid.txt", 'w+')
         for i in tops:
+            f.write(i[1] + '\t' + str(i[0]))
+            f.write('\n')
             vid_name = ip_info.get_vedio_info(i[1])
             if not vid_name:
                 continue
             if self.is_valid(vid_name[0]):
                 top10_count += 1
-                res.append((i[0], vid_name))
+                top10_vid.append(i[1])
+                res.append((i, vid_name))
             ''' don't get video name
             top10_count += 1
             res.append((i[0], i[1]))
@@ -280,7 +340,7 @@ class Reduce:
             return False
         if re.match('[a-z]+\d+', name):
             return False
-        if re.match('\w+\.flv\Z', name):
+        if re.match('(\w+/?)+\.flv', name):
             return False
         if re.match('预告片.*', name):
             return False

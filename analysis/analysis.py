@@ -18,6 +18,9 @@ class Statistics:
         self.db = db
         self.last_time = None
         self.count_per_five_second = 0
+        self.last_time_str = None
+        self.second_count = 0
+        self.time_dic = {}
 
     def analysis(self, logs):
         df = pd.DataFrame()
@@ -40,21 +43,14 @@ class Statistics:
             for j in range(10):
                 print(tmp[j])
 
+    @profile
     def count(self, l):
         #cur_time = datetime.datetime.strptime(l[0], '%Y-%m-%d %H:%M:%S')
-        date, time = l[0].split()
-        year, month, day = date.split('-')
-        hour, minute, second = time.split(':')
-        cur_time = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-        if self.last_time == None:
-            self.last_time = cur_time
-            self.results['count_per_five_second'] = []
-        if (cur_time - self.last_time).seconds < 5:
-            self.count_per_five_second += 1
+        if self.time_dic.get(l[0]) is None:
+            self.time_dic[l[0]] = 1
         else:
-            self.results['count_per_five_second'].append(self.count_per_five_second)
-            self.last_time = cur_time
-            self.count_per_five_second = 1
+            self.time_dic[l[0]] += 1
+
         prov = l[5]
         city = l[6]
         source_city = l[8]
@@ -64,10 +60,13 @@ class Statistics:
             if self.results['source'].get(source_city) == None:
                 self.results['source'][source_city] = {}
                 self.results['source'][source_city]['total'] = 0
-            if self.results['source'][source_city].get(city) == None:
-                self.results['source'][source_city][city] = 0
-            self.results['source'][source_city][city] += 1
+            if city != None:
+                if self.results['source'][source_city].get(city) == None:
+                    self.results['source'][source_city][city] = 0
+                self.results['source'][source_city][city] += 1
             self.results['source'][source_city]['total'] += 1
+        if self.results.get('source') == None:
+            self.results['source'] = {}
 
         if self.results.get(prov) == None:
             self.results[prov] = {}
@@ -90,10 +89,23 @@ class Statistics:
             rds.store_top(self.file_name, {})
             return
 
-        if self.results.get('count_per_five_second') == None:
-            self.results['count_per_five_second'] = []
-        else:
-            self.results['count_per_five_second'].append(self.count_per_five_second)
+        #get count for every 5 seconds
+        #because the time is inorder, so need sort time
+        self.results['count_per_five_second'] = []
+        time_count_heap = []
+        for keys_time in self.time_dic:
+            heapq.heappush(time_count_heap, (keys_time, self.time_dic[keys_time]))
+        time_count = 0
+        second_count = 0
+        while len(time_count_heap):
+            smallest = heapq.heappop(time_count_heap)
+            time_count += 1
+            second_count += smallest[1]
+            if time_count >= 5:
+                self.results['count_per_five_second'].append(second_count)
+                second_count = 0
+                time_count = 0
+
         res_json = {}
         res_json['count_per_five_second'] = self.results['count_per_five_second']
         res_json['source'] = self.results['source']

@@ -8,6 +8,7 @@ import tarfile
 import os
 import main
 import time
+import zlib
 
 class Worker:
     def __init__(self):
@@ -64,13 +65,16 @@ class Worker:
                     os.remove(new_file_path)
                 except tarfile.TarError:
                     print("tarfile error")
+                    raise(tarfile.TarError('tarfile tar error'))
                 except tarfile.ReadError:
                     print("read tarfile error")
+                    raise(tarfile.ReadError("read tarfile error"))
             else:
+                print("cann't async to file_path")
                 ch.basic_reject(delivery_tag=method.delivery_tag)
                 #ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
-        except (OSError, pika.exceptions.ConnectionClosed) as err:
+        except (OSError, pika.exceptions.ConnectionClosed, zlib.error) as err:
             #ch.basic_reject(delivery_tag=method.delivery_tag)
             os.remove(new_file_path);
             f = open("../src-logs/" + tarinfo.name, 'w')

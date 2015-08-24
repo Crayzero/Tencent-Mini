@@ -18,6 +18,7 @@ router.get('/prov/all', function (req, res, next) {
             var result = JSON.parse(reply);
             reply = null;
             var data = [];
+            var total = 0;
 
             for (var i in result) {
                 if (i == 'count_per_five_second') {
@@ -29,7 +30,14 @@ router.get('/prov/all', function (req, res, next) {
                 if (i == 'time') {
                     continue;
                 }
+                if (i == 'top10') {
+                    continue;
+                }
+                if (i == 'extra') {
+                    continue;
+                }
                 data.push({name: i, value: result[i]['total']});
+                total += result[i]['total'];
             }
             if (data.length == 0) {
                 res.type('application/json');
@@ -48,7 +56,7 @@ router.get('/prov/all', function (req, res, next) {
             var start_time = new Date(result.time.start_time);
             var times = [];
             var time_counts = result.count_per_five_second;
-            for(var i = 0; i < time_counts.length; i++) {
+            for(var i = 0; i < Math.min(time_counts.length,60); i++) {
                 times.push(start_time.toLocaleTimeString());
                 start_time.setSeconds(start_time.getSeconds() + 5);
             }
@@ -60,7 +68,7 @@ router.get('/prov/all', function (req, res, next) {
             page1.prov = data;
             page1.top10 = top10_result;
             page1.time_count = time_count;
-            console.log(top10_result);
+            page1.total = total;
             res.type('application/json');
             res.json(page1);
             fs.open('../routes/page1.json', 'w', function(err, fd) {
