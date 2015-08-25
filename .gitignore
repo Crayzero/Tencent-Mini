@@ -8,3 +8,4 @@ dispatch/processed.txt
 reducer/output.txt
 *.txt
 web/mini/routes/page1.json
+web/mini/log/*

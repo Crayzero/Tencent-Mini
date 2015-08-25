@@ -9,7 +9,7 @@ var encoding = require('encoding');
 var res = {};
 
 
-function f(server_index) {
+function f(server_index, callback) {
     amqp.connect('amqp://' + config.rabbitmq_servers[server_index], function(err, conn) {
         if (err) {
             console.error("cann't connect to server. try another.")
@@ -41,6 +41,8 @@ function f(server_index) {
                     ch.bindQueue(q.queue, ex, '');
 
                     ch.consume(q.queue, function(msg) {
+                        callback && callback();
+                        /*
                         var receive_msg = msg.content.toString();
                         var redis_key = config.result;
                         redisClient.get_key(redis_key, function (err, reply) {
@@ -56,6 +58,7 @@ function f(server_index) {
                                 }
                             }
                         });
+                        */
                         ch.ack(msg);
                     }, {noAck: false});
                 });
@@ -64,10 +67,8 @@ function f(server_index) {
     });
 }
 
-function get_res() {
-    return res;
+function report_new_result(callback) {
+    f(0, callback);
 }
 
-f(0);
-
-exports.get_res = get_res;
+module.exports = report_new_result;

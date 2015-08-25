@@ -1,6 +1,5 @@
 var express = require('express');
 var router = express.Router();
-var receive = require('../receiver');
 var redisClient = require('../redisClient.js')
 
 /* GET home page. */

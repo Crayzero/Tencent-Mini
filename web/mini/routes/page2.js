@@ -1,6 +1,5 @@
 var express = require('express');
 var router = express.Router();
-var receive = require('../receiver');
 var redisClient = require('../redisClient');
 var convert_table = require('./convert');
 var locations = require('./location');
@@ -17,7 +16,6 @@ router.get('/prov(/all)?', function (req, res, next) {
         }
         else {
             var result = JSON.parse(reply);
-            console.log(result);
             reply = null;
             var whole_country = {};
             if (result == null) {

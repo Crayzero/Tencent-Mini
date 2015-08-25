@@ -43,7 +43,6 @@ class Statistics:
             for j in range(10):
                 print(tmp[j])
 
-    @profile
     def count(self, l):
         #cur_time = datetime.datetime.strptime(l[0], '%Y-%m-%d %H:%M:%S')
         if self.time_dic.get(l[0]) is None:

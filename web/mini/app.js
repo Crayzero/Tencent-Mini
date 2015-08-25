@@ -4,6 +4,7 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
+var fs = require('fs');
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
@@ -19,7 +20,18 @@ app.set('view engine', 'ejs');
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
-app.use(logger('dev'));
+try {
+    fs.openSync(__dirname + '/log/access.log', 'r');
+}
+catch (e) {
+    if (e.code === 'ENOENT') {
+        fs.openSync(__dirname + '/log/access.log', 'w');
+    }
+}
+
+var accessLogStream = fs.createWriteStream(__dirname + '/log/access.log', {flags: 'a'});
+app.use(logger('combined', {stream: accessLogStream}));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());

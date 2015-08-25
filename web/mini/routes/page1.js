@@ -1,6 +1,5 @@
 var express = require('express');
 var router = express.Router();
-var receive = require('../receiver');
 var redisClient = require('../redisClient.js');
 var Heap = require('heap');
 var fs = require('fs');
@@ -71,6 +70,8 @@ router.get('/prov/all', function (req, res, next) {
             page1.total = total;
             res.type('application/json');
             res.json(page1);
+
+            /* write the result to file
             fs.open('../routes/page1.json', 'w', function(err, fd) {
                 if (err) {
                     console.log(err);
@@ -86,6 +87,7 @@ router.get('/prov/all', function (req, res, next) {
                     });
                 }
             });
+            */
         }
     });
 });
