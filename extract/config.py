@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-log_file = "../src-logs/10.231.144.78_20150810233"
+log_file = "../src-logs/10.231.144.78_20150810242"
+split_lines = 500000
+process_new_file = True
+process_part_file = True
 
 mysql = {
     'user': 'root',

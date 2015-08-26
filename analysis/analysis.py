@@ -90,6 +90,7 @@ class Statistics:
 
         #get count for every 5 seconds
         #because the time is inorder, so need sort time
+        '''
         self.results['count_per_five_second'] = []
         time_count_heap = []
         for keys_time in self.time_dic:
@@ -104,9 +105,10 @@ class Statistics:
                 self.results['count_per_five_second'].append(second_count)
                 second_count = 0
                 time_count = 0
+        '''
 
         res_json = {}
-        res_json['count_per_five_second'] = self.results['count_per_five_second']
+        #res_json['count_per_five_second'] = self.results['count_per_five_second']
         res_json['source'] = self.results['source']
         for prov in self.results:
             if prov == '默认':

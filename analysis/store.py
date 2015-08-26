@@ -16,8 +16,8 @@ class RedisStorage:
         self.port = port
         self.db = db
         self.pool = None
-        self._connect()
         self.r = None
+        self._connect()
 
     def _connect(self):
         for redis_server in config.redis_servers:
@@ -84,6 +84,12 @@ class RedisStorage:
         #self._store(self.file_hash(file_name), value)
         self._store(self.get_file_name(file_name), value)
 
+    def store_part_length(self, file_name, length):
+        value = {}
+        value['length'] = length
+        value['processed'] = {}
+        self._store(file_name, json.dumps(value))
+
     def store(self, key, value, timeout=None):
         self._store(key, value)
         if timeout:
@@ -91,7 +97,7 @@ class RedisStorage:
 
     def get_top(self, key):
         try:
-            s = self.r.get(key).decode()
+            s = self.r.get(key).decode('utf-8')
             obj = json.loads(s)
             s = None
             return obj
