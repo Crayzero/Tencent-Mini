@@ -82,6 +82,9 @@ router.param('city', function(req, res, next, city) {
                     return ;
                 }
                 city_source['top10'].forEach(function(item) {
+                    if (typeof locations[item[1]] === 'undefined') {
+                        return ;
+                    }
                     if (locations[item[1]] && locations[item[1]].prov != city_chinese) {
                         return ;
                     }
