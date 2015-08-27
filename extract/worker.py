@@ -136,13 +136,19 @@ class Worker:
             #if file is split remove the old file
             os.remove(file_name)
             for file_path in files:
+                #if received finished processed Message, just to delete the split file
+                self.subscribe_finish(file_path)
                 self.reportNewPartFile(file_path, length)
         else:
             #if file cann't be split, reserve the old file
+            #once received finish processed Message, delete the tmp zero size file
+            self.subscribe_finish(file_name.split('/')[-1])
+
             rds = store.RedisStorage()
             rds.store_part_length(file_name.split('/')[-1],  0)
 
             self.reportNewPartFile(file_name, 0)
+
 
     def reportNewPartFile(self, file_path, length):
         for server in config.rabbitmq_servers:
@@ -196,6 +202,8 @@ class Worker:
             ch.basic_ack(delivery_tag=method.delivery_tag)
             #ch.basic_reject(delivery_tag=method.delivery_tag)
 
+    def subscribe_finish(self, file_path):
+        pass
 
 import unittest
 
