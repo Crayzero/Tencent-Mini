@@ -88,27 +88,9 @@ class Statistics:
             rds.store_top(self.file_name, {})
             return
 
-        #get count for every 5 seconds
-        #because the time is inorder, so need sort time
-        '''
-        self.results['count_per_five_second'] = []
-        time_count_heap = []
-        for keys_time in self.time_dic:
-            heapq.heappush(time_count_heap, (keys_time, self.time_dic[keys_time]))
-        time_count = 0
-        second_count = 0
-        while len(time_count_heap):
-            smallest = heapq.heappop(time_count_heap)
-            time_count += 1
-            second_count += smallest[1]
-            if time_count >= 5:
-                self.results['count_per_five_second'].append(second_count)
-                second_count = 0
-                time_count = 0
-        '''
-
         res_json = {}
         #res_json['count_per_five_second'] = self.results['count_per_five_second']
+        res_json['time'] = self.time_dic
         res_json['source'] = self.results['source']
         for prov in self.results:
             if prov == '默认':

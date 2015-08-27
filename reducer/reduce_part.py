@@ -11,6 +11,7 @@ import json
 import redlock
 import time
 import random
+import heapq
 
 class ReducePart:
     def __init__(self):
@@ -57,8 +58,7 @@ class ReducePart:
                 self.union(file_name, part_file_name)
             else:
                 #file is not splited, so direct report the new result
-                pass
-                #self.report_new_result(file_name)
+                self.report_new_result(file_name)
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
             #ch.basic_cancel('a')
@@ -70,10 +70,10 @@ class ReducePart:
             print('unlock the lock')
 
     def union(self, file_name, part_file_name):
-        middle_result = self.redis_client.get(file_name)
-        part_result = self.redis_client.get(part_file_name)
-        middle_result = json.loads(middle_result.decode('utf-8'))
-        part_result = json.loads(part_result.decode('utf-8'))
+        middle_result_bytes = self.redis_client.get(file_name)
+        part_result_bytes = self.redis_client.get(part_file_name)
+        middle_result = json.loads(middle_result_bytes.decode('utf-8'))
+        part_result = json.loads(part_result_bytes.decode('utf-8'))
 
         start_time = None
         end_time = None
@@ -86,13 +86,94 @@ class ReducePart:
         if middle_result.get('result') == None:
             middle_result['result'] = part_result
         else:
-            pass
+            for key in part_result:
+                if key == 'source':
+                    self.union_source(middle_result['result']['source'], part_result['source'])
+                elif key == 'time':
+                    self.union_time(middle_result['result']['time'], part_result['time'])
+                else:
+                    self.union_prov(middle_result['result'][key], part_result[key])
+
         if len(middle_result['processed']) == middle_result['length']:
-            middle_result = middle_result['result']
+            print("union all parts")
+            (start_time, end_time) = self.union_all(middle_result['result'])
+            self.redis_client._store(file_name, json.dumps(middle_result))
             self.report_new_result(file_name, start_time, end_time)
         else:
             self.redis_client._store(file_name, json.dumps(middle_result))
+
         self.redis_client.delete(part_file_name)
+
+
+    def union_source(self, middle_source, part_source):
+        if middle_source is None:
+            middle_source = {}
+        for src_city in part_source:
+            if middle_source.get(src_city) is None:
+                middle_source[src_city] = {}
+            for dst_city in part_source[src_city]:
+                if middle_source[src_city].get(dst_city) is None:
+                    middle_source[src_city][dst_city] = 0
+                middle_source[src_city][dst_city] += part_source[src_city][dst_city]
+
+
+    def union_time(self, middle_time, part_time):
+        if middle_time is None:
+            middle_time = {}
+        for key_time in part_time:
+            if middle_time.get(key_time) is None:
+                middle_time[key_time] = part_time[key_time]
+            else:
+                middle_time[key_time] += part_time[key_time]
+
+
+    def union_prov(self, middle_prov, part_prov):
+        if part_prov.get('count') is not None:
+            for vid in part_prov['count']:
+                if middle_prov.get('count') is None:
+                    middle_prov['count'] = {}
+                if middle_prov['count'].get(vid) is None:
+                    middle_prov['count'][vid] = part_prov['count'][vid]
+                else:
+                    middle_prov['count'][vid] += part_prov['count'][vid]
+
+        if part_prov.get('city') is not None:
+            for city in part_prov['city']:
+                if middle_prov.get('city') is None:
+                    middle_prov['city'] = {}
+                if middle_prov['city'].get(city) is None:
+                    middle_prov['city'][city] = {'count': 0}
+                if middle_prov['city'][city].get('count') is None:
+                    middle_prov['city'][city]['count'] = 0
+                middle_prov['city'][city]['count'] += part_prov['city'][city]['count']
+
+        if part_prov.get('total') is not None:
+            if middle_prov.get('total') is None:
+                middle_prov['total'] = 0
+            middle_prov['total'] += part_prov['total']
+
+    def union_all(self, middle_result):
+        middle_result['count_per_five_second'] = []
+        min_time = None
+        max_time = None
+        if middle_result.get('time') is not None:
+            time_heap = []
+            time_heap = sorted(middle_result['time'])
+            min_time = time_heap[0]
+            max_time = time_heap[-1]
+            count = 0
+            total = 0
+            for key_time in time_heap:
+                total += middle_result['time'][key_time]
+                count += 1
+                if count >= 5:
+                    middle_result['count_per_five_second'].append(total)
+                    count = 0
+                    total = 0
+            time_heap = None
+            middle_result.pop('time')
+        return (min_time, max_time)
+
 
 
     def report_new_result(self, file_name, start_time=None, end_time=None):
