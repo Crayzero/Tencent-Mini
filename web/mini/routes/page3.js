@@ -23,7 +23,8 @@ router.get('/city(/all)?', function (req, res, next) {
             }
             else {
                 var flow_point = [];
-                var flow_data_json = [];
+                var flow_point_json = {};
+                var flow_data_json = {};
                 var citys = ['北京市', '上海市', '广州市', '深圳市',
                     '武汉市', '成都市']
                 citys.forEach(function (src_city, index) {
@@ -31,15 +32,19 @@ router.get('/city(/all)?', function (req, res, next) {
                         if (index > 10) {
                             return ;
                         }
-                        flow_point.push([{name: src_city}, {name: item[1]}]);
-                        if (typeof flow_data_json[item[1]] === 'undefined') {
-                            flow_data_json[item[1]] = item[0];
+                        flow_point.push([{name: src_city}, {
+                                            name: item[1],
+                                            value: item[0]}
+                        ]);
+                        if (typeof flow_data_json[src_city] === 'undefined') {
+                            flow_data_json[src_city] = item[0];
                         }
                         else {
-                            flow_data_json[item[1]] += item[0];
+                            flow_data_json[src_city] += item[0];
                         }
                     });
                 });
+
                 var flow_data = [];
                 for (var city in flow_data_json) {
                     flow_data.push({
@@ -72,15 +77,20 @@ router.param('city', function(req, res, next, city) {
                     citys.push(src_city);
                 }
             }
+
             reply = null;
             var flow_point = [];
             var flow_data = [];
+            var flow_data_json = {};
+            var city_flow_point = {};
 
             citys.forEach(function (src_city)  {
                 var city_source = result['source'][src_city];
                 if (typeof city_source === 'undefined') {
                     return ;
                 }
+                flow_data_json[src_city] = 0;
+
                 city_source['top10'].forEach(function(item) {
                     if (typeof locations[item[1]] === 'undefined') {
                         return ;
@@ -88,10 +98,21 @@ router.param('city', function(req, res, next, city) {
                     if (locations[item[1]] && locations[item[1]].prov != city_chinese) {
                         return ;
                     }
-                    flow_point.push([{name: src_city}, {name: item[1]}]);
-                    flow_data.push({name: item[1], value: item[0]});
+                    flow_point.push([{name: src_city}, {
+                                        name: item[1],
+                                        //value: item[0]
+                        }]
+                    );
+                    flow_data_json[src_city] += item[0];
                 });
             });
+
+            for (var src_city in flow_data_json) {
+                flow_data.push({
+                    name: src_city,
+                    value: flow_data_json[src_city]
+                });
+            }
 
             var flow = {data: flow_point, value: flow_data};
             res.type('application/json');
