@@ -13,6 +13,7 @@ import json
 import sys
 sys.path.append('../analysis')
 import store
+from collections import deque
 
 class Worker:
     def __init__(self):
@@ -20,6 +21,7 @@ class Worker:
         self.channel = None
         self.connect()
         self.e = main.Extract()
+        self.file_deque = deque()
 
     def connect(self):
         for rabbitmq_server in config.rabbitmq_servers:
@@ -40,6 +42,7 @@ class Worker:
             self.cnx.channel(on_open_callback=self.on_channel1_open)
         if config.process_part_file:
             self.cnx.channel(on_open_callback=self.on_channel2_open)
+        self.cnx.channel(on_subscribe_channel_open)
 
     def on_channel1_open(self, channel):
         #channel1 process the rsync file
@@ -202,8 +205,23 @@ class Worker:
             ch.basic_ack(delivery_tag=method.delivery_tag)
             #ch.basic_reject(delivery_tag=method.delivery_tag)
 
-    def subscribe_finish(self, file_path):
+    def subscribe_finish(self):
+        self.subcribe_channel.exchange_declare(self.on_subscribe_exchange_declareok, "part_file_finished", "direct")
+
+    def on_subscribe_channel_open(self, channel):
+        self.subcribe_channel = channel
+
+    def on_subscribe_exchange_declareok(self):
+        if not self.file_deque.empty():
+            file_name = self.file_deque[0]
+        else:
+            return
+        self.subcribe_channel.queue_declare(self.on_subscribe_queue_declareok, file_name)
+
+    def on_subscribe_queue_declareok(self):
         pass
+
+
 
 import unittest
 
