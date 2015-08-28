@@ -43,15 +43,19 @@ router.get('/city(/all)?', function (req, res, next) {
                             flow_data_json[src_city] += item[0];
                         }
                     });
+                    flow_point_json[src_city] = flow_point;
+                    flow_point = [];
                 });
 
+                /*
                 var flow_data = [];
                 for (var city in flow_data_json) {
                     flow_data.push({
                         name: city, value: flow_data_json[city]});
                 }
+                */
             }
-            result = {data: flow_point, value: flow_data};
+            result = {data: flow_point_json, value: flow_data_json};
             res.type('application/json');
             res.json(result);
         }
@@ -100,21 +104,25 @@ router.param('city', function(req, res, next, city) {
                     }
                     flow_point.push([{name: src_city}, {
                                         name: item[1],
-                                        //value: item[0]
+                                        value: item[0]
                         }]
                     );
                     flow_data_json[src_city] += item[0];
                 });
+                city_flow_point[src_city] = flow_point;
+                flow_point = [];
             });
 
+            /*
             for (var src_city in flow_data_json) {
                 flow_data.push({
                     name: src_city,
                     value: flow_data_json[src_city]
                 });
             }
+            */
 
-            var flow = {data: flow_point, value: flow_data};
+            var flow = {data: city_flow_point, value: flow_data_json};
             res.type('application/json');
             res.json(flow);
         }

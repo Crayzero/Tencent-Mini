@@ -22,7 +22,8 @@ class Rsync:
         res = []
         for line in p.stdout:
             line = line.decode('utf-8')[:-1]
-            res.append(line)
+            if line.find('.tar.gz'):
+                res.append(line)
         return res
 
     def get_new_files(self):
