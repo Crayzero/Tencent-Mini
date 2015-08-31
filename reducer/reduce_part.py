@@ -207,7 +207,8 @@ class ReducePart:
                 print(e)
                 print("channel error occured...try another server")
         else:
-            print("there is some thing wrong with rabbitmq")
+            print("there is something wrong with rabbitmq")
+
 
 
 if __name__ == '__main__':

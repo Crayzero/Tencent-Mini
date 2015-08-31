@@ -42,7 +42,7 @@ class Worker:
             self.cnx.channel(on_open_callback=self.on_channel1_open)
         if config.process_part_file:
             self.cnx.channel(on_open_callback=self.on_channel2_open)
-        self.cnx.channel(on_subscribe_channel_open)
+        self.cnx.channel(self.on_subscribe_channel_open)
 
     def on_channel1_open(self, channel):
         #channel1 process the rsync file
@@ -140,12 +140,14 @@ class Worker:
             os.remove(file_name)
             for file_path in files:
                 #if received finished processed Message, just to delete the split file
-                self.subscribe_finish(file_path)
+                self.file_deque.append(file_path.split('/')[-1])
+                #self.subscribe_finish()
                 self.reportNewPartFile(file_path, length)
         else:
             #if file cann't be split, reserve the old file
             #once received finish processed Message, delete the tmp zero size file
-            self.subscribe_finish(file_name.split('/')[-1])
+            self.file_deque.append(file_name.split('/')[-1])
+            #self.subscribe_finish()
 
             rds = store.RedisStorage()
             rds.store_part_length(file_name.split('/')[-1],  0)
@@ -182,8 +184,37 @@ class Worker:
         else:
             print("cann't connect to the rabbitmq server")
 
+    def reportPartFileFinished(self, file_path):
+        for server in config.rabbitmq_servers:
+            try:
+                cnx = pika.BlockingConnection(pika.ConnectionParameters(host=server['host']))
+                channel = cnx.channel()
+                msg = file_path
+
+                channel.exchange_declare(exchange='part_file_finished_to_remove', type='direct')
+                res = channel.basic_publish(exchange='part_file_finished_to_remove',
+                                routing_key=file_path.split('/')[-1],
+                                body=msg,
+                                properties=pika.BasicProperties(
+                                    content_type='application/json',
+                                    delivery_mode=1
+                                    ))
+                cnx.close()
+                if res:
+                    break
+                else:
+                    print("Message was returned, try another server.")
+            except pika.exceptions.AMQPConnectionError as err:
+                print(err)
+            except pika.exceptions.ChannelError as err:
+                print(err)
+        else:
+            print("cann't connect to the rabbitmq server")
+
+
     def processPartFile(self, ch, method, properties, body):
         msg = body.decode('utf-8')
+        print(msg)
         msg_json = json.loads(msg)
         file = msg_json['file_path']
         length = msg_json['length']
@@ -197,7 +228,9 @@ class Worker:
             file_name = file.split('/')[-1]
             self.e.extract("../src-logs/" + file_name, length)
             print("extract file ", file_name, " finished. ", time.clock())
-            #os.remove("../src-logs/" + file.split('/')[-1])
+            os.remove("../src-logs/" + file.split('/')[-1])
+
+            self.reportPartFileFinished(file_name)
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
         except subprocess.CalledProcessError as e:
@@ -206,21 +239,42 @@ class Worker:
             #ch.basic_reject(delivery_tag=method.delivery_tag)
 
     def subscribe_finish(self):
-        self.subcribe_channel.exchange_declare(self.on_subscribe_exchange_declareok, "part_file_finished", "direct")
+        print("subscibing...")
+        self.subscribe_channel.exchange_declare(self.on_subscribe_exchange_declareok, "part_file_finished_to_remove", "direct")
 
     def on_subscribe_channel_open(self, channel):
-        self.subcribe_channel = channel
+        self.subscribe_channel = channel
 
-    def on_subscribe_exchange_declareok(self):
-        if not self.file_deque.empty():
+    def on_subscribe_exchange_declareok(self, unused_frame):
+        print("exchange declare ok")
+        if len(self.file_deque):
             file_name = self.file_deque[0]
         else:
             return
-        self.subcribe_channel.queue_declare(self.on_subscribe_queue_declareok, file_name)
+        self.subscribe_channel.queue_declare(self.on_subscribe_queue_declareok, file_name)
 
-    def on_subscribe_queue_declareok(self):
-        pass
+    def on_subscribe_queue_declareok(self, method_frame):
+        print("queue name is ", method_frame.method.queue)
+        if len(self.file_deque):
+            file_name = self.file_deque[0]
+        else:
+            return
+        self.subscribe_channel.queue_bind(self.on_subscribe_queue_bindok, method_frame.method.queue, "part_file_finished_to_remove", file_name)
 
+    def on_subscribe_queue_bindok(self, unused_frame):
+        if len(self.file_deque):
+            queue_name = self.file_deque.popleft()
+        else:
+            return
+
+        print("waiting on queue:", queue_name)
+        self.subscribe_channel.basic_consume(self.on_subcscribe_message, queue_name)
+
+    def on_subcscribe_message(self, channel, basic_deliver,properties, body):
+        body = body.decode('utf-8')
+        if os.path.exists('../src-logs/' + body):
+            os.remove('../src-logs/+' + body)
+        channel.basic_ack(basic_deliver.delivery_tag)
 
 
 import unittest
