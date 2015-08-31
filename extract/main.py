@@ -33,7 +33,7 @@ class Extract:
         self.end_time = None
         self.cityService = ip_info.CityService(True)
 
-    def extract(self, file_path):
+    def extract(self, file_path, length=1):
         self.__file = file_path
         print("extract file " + self.__file)
         encodings = ['cp936', 'gbk', 'utf-8']
@@ -106,7 +106,7 @@ class Extract:
                             source_addr = socket.getaddrinfo(addr_url, 80)[0][-1][0]
                             source_addr = self.cityService.get_city_by_ip(source_addr)
                             self.dns[addr_url] = source_addr
-                    except Exception as e:
+                    except Exception:
                         source_addr = None
                         self.dns[addr_url] = source_addr
             extra = columns[8]
@@ -132,8 +132,6 @@ class Extract:
         rabbitmq_servers = ['localhost']
         server_index = 0
         msg = {}
-        msg["start_time"] = self.start_time
-        msg['end_time'] = self.end_time
         self.start_time = None
         self.end_time = None
         msg['key'] = os.path.basename(self.__file)
@@ -143,9 +141,9 @@ class Extract:
                 cnx = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_servers[server_index]))
                 channel = cnx.channel()
 
-                channel.queue_declare(queue='task_finished', exclusive=False)
+                channel.queue_declare(queue='part_task_finished', exclusive=False)
                 res = channel.basic_publish(exchange='',
-                        routing_key='task_finished',
+                        routing_key='part_task_finished',
                         body=msg,
                         properties=pika.BasicProperties(
                             content_type='application/json',

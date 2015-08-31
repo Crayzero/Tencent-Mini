@@ -55,6 +55,9 @@ class Reduce:
                     break
 
             map_result = self.redis_client.get_map_result(key)
+            if map_result.get('result') is not None:
+                map_result = map_result['result']
+
             self.union(map_result, logfile_ip, log_num, start_time, end_time)
             self.redis_client.delete(key)
             map_result = None
